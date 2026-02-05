@@ -1,239 +1,106 @@
 
 import React from 'react';
-import { NovelItem, Chapter, Volume, ChapterStatus } from '../../types';
-import { ChevronRightIcon, ChevronDownIcon, FolderIcon, FolderOpenIcon, PlusIcon, TrashIcon } from '../Icons';
+import { NovelItem, Chapter } from '../../types';
+import { TrashIcon, GripVerticalIcon } from '../Icons';
 import { DragState } from '../../hooks/useSidebarState';
 
 interface SidebarItemProps {
     item: NovelItem;
     activeChapterId: string;
     onSelectChapter: (id: string) => void;
-    onToggleVolume: (id: string) => void;
     onContextMenu: (e: React.MouseEvent, item: NovelItem) => void;
     
-    // Drag Props
     dragState: DragState;
     onDragStart: (e: React.DragEvent, item: NovelItem) => void;
     onDragOver: (e: React.DragEvent, item: NovelItem) => void;
     onDragLeave: (e: React.DragEvent) => void;
     onDrop: (e: React.DragEvent, item: NovelItem) => void;
 
-    // Edit Props
     editingItemId: string | null;
     editTitle: string;
     setEditTitle: (val: string) => void;
     saveEditing: () => void;
 
-    // Actions
-    onCreateChapter: (parentId: string | null) => void;
-    onDeleteItem: (id: string, type: 'CHAPTER' | 'VOLUME') => void;
-    parentId: string | null;
+    onCreateChapter: () => void;
+    onDeleteItem: (id: string) => void;
 }
 
-export const SidebarItem: React.FC<SidebarItemProps> = ({
-    item,
-    activeChapterId,
-    onSelectChapter,
-    onToggleVolume,
-    onContextMenu,
-    dragState,
-    onDragStart,
-    onDragOver,
-    onDragLeave,
-    onDrop,
-    editingItemId,
-    editTitle,
-    setEditTitle,
-    saveEditing,
-    onCreateChapter,
-    onDeleteItem,
-    parentId
-}) => {
-    const isDragging = dragState.draggedId === item.id;
-    const isOver = dragState.overId === item.id;
-    const dropPosition = dragState.dropPosition;
+const DropIndicator = ({ isOver, dropPosition }: { isOver: boolean, dropPosition: string | null }) => (
+    <>
+        {isOver && dropPosition === 'BEFORE' && (
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-indigo-500 z-50 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+        )}
+        {isOver && dropPosition === 'AFTER' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 z-50 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+        )}
+    </>
+);
 
-    // Helper to render drop indicators (Visual Lines)
-    const DropIndicator = () => (
-        <>
-            {isOver && dropPosition === 'BEFORE' && (
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-indigo-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
-            )}
-            {isOver && dropPosition === 'AFTER' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 z-50 pointer-events-none shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
-            )}
-            {isOver && dropPosition === 'INSIDE' && (
-                <div className="absolute inset-0 bg-indigo-500/10 border-2 border-indigo-500 rounded-xl z-50 pointer-events-none" />
-            )}
-        </>
-    );
+export const SidebarItem: React.FC<SidebarItemProps> = (props) => {
+    const chapter = props.item as Chapter;
+    const isDragging = props.dragState.draggedId === chapter.id;
+    const isOver = props.dragState.overId === chapter.id;
+    const dropPosition = props.dragState.dropPosition;
+    const isActive = props.activeChapterId === chapter.id;
 
-    // Hover Action Buttons
-    const HoverActions = ({ onAdd, onDelete }: { onAdd: () => void, onDelete: () => void }) => (
-        <div className="absolute right-2 top-0 bottom-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 pl-4 bg-gradient-to-l from-inherit via-inherit to-transparent">
-            <button 
-                onClick={(e) => { e.stopPropagation(); onAdd(); }}
-                className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50 dark:hover:bg-white/10 transition-colors"
-                title="新建章节"
-            >
-                <PlusIcon className="w-3.5 h-3.5" />
-            </button>
-            <button 
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="p-1.5 text-rose-400 hover:text-rose-600 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
-                title="删除"
-            >
-                <TrashIcon className="w-3.5 h-3.5" />
-            </button>
+    // Base styles: Compact padding (py-2), smaller font, rounded-lg
+    let containerStyle = "group relative flex items-center gap-2.5 px-3.5 py-2 rounded-lg text-sm text-left transition-all duration-200 cursor-pointer select-none ";
+    
+    if (isActive) {
+        // Active: Distinctive but refined. Left border indicator simulation using shadow or border-l
+        containerStyle += "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm ring-1 ring-indigo-200 dark:ring-transparent";
+    } else {
+        // Inactive: Subtle interaction, not just flat
+        containerStyle += "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-200 border border-transparent";
+    }
+
+    if (isDragging) {
+        containerStyle += " opacity-40 border-dashed border-indigo-400 bg-indigo-50 scale-95";
+    }
+
+    return (
+        <div
+            draggable
+            onDragStart={(e) => props.onDragStart(e, chapter)}
+            onDragOver={(e) => props.onDragOver(e, chapter)}
+            onDragLeave={props.onDragLeave}
+            onDrop={(e) => props.onDrop(e, chapter)}
+            onContextMenu={(e) => props.onContextMenu(e, chapter)}
+            className={containerStyle}
+            onClick={() => props.onSelectChapter(chapter.id)}
+        >
+            <DropIndicator isOver={isOver} dropPosition={dropPosition} />
+
+            {/* Drag Handle - Subtle */}
+            <div className={`text-slate-300 dark:text-slate-600 cursor-grab active:cursor-grabbing shrink-0 ${isActive || isOver ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'} transition-opacity`}>
+                <GripVerticalIcon className="w-3 h-3" />
+            </div>
+
+            {props.editingItemId === chapter.id ? (
+                <input 
+                    autoFocus
+                    value={props.editTitle}
+                    onChange={(e) => props.setEditTitle(e.target.value)}
+                    onBlur={props.saveEditing}
+                    onKeyDown={(e) => e.key === 'Enter' && props.saveEditing()}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 bg-white dark:bg-[#0d1117] px-1.5 py-0.5 rounded border border-indigo-300 dark:border-indigo-700 outline-none text-slate-800 dark:text-slate-100 text-sm font-medium shadow-sm min-w-0"
+                />
+            ) : (
+                <span className="truncate flex-1 min-w-0">
+                    {chapter.title}
+                </span>
+            )}
+
+            {!isDragging && !props.editingItemId && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); props.onDeleteItem(chapter.id); }}
+                    className="p-1 text-slate-300 hover:text-rose-500 rounded hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                    title="删除"
+                >
+                    <TrashIcon className="w-3.5 h-3.5" />
+                </button>
+            )}
         </div>
     );
-
-    if (item.type === 'VOLUME') {
-        const volume = item as Volume;
-        return (
-            <div className="mb-1">
-                <div 
-                    draggable
-                    onDragStart={(e) => onDragStart(e, volume)}
-                    onDragOver={(e) => onDragOver(e, volume)}
-                    onDragLeave={onDragLeave}
-                    onDrop={(e) => onDrop(e, volume)}
-                    onContextMenu={(e) => onContextMenu(e, volume)}
-                    onClick={() => onToggleVolume(volume.id)}
-                    className={`
-                        group flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none transition-all mx-3 mb-1 rounded-xl relative overflow-hidden
-                        ${isDragging ? 'opacity-30 border-dashed border-2 border-indigo-300' : 'border-2 border-transparent'}
-                        ${!isDragging && 'hover:bg-white/60 dark:hover:bg-white/5'}
-                    `}
-                >
-                    <DropIndicator />
-                    
-                    <div className="text-slate-400 transition-transform">
-                        {volume.collapsed ? <ChevronRightIcon className="w-3.5 h-3.5" /> : <ChevronDownIcon className="w-3.5 h-3.5" />}
-                    </div>
-                    <div className="text-indigo-400 dark:text-indigo-500">
-                        {volume.collapsed ? <FolderIcon className="w-4 h-4" /> : <FolderOpenIcon className="w-4 h-4" />}
-                    </div>
-                    
-                    {editingItemId === volume.id ? (
-                        <input 
-                            autoFocus
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            onBlur={saveEditing}
-                            onKeyDown={(e) => e.key === 'Enter' && saveEditing()}
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex-1 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded outline-none text-slate-800 dark:text-slate-100 select-text"
-                        />
-                    ) : (
-                        <span className="truncate flex-1">{volume.title}</span>
-                    )}
-
-                    {!isDragging && !editingItemId && (
-                        <HoverActions 
-                            onAdd={() => onCreateChapter(volume.id)}
-                            onDelete={() => onDeleteItem(volume.id, 'VOLUME')}
-                        />
-                    )}
-                </div>
-
-                {!volume.collapsed && (
-                    <div className="ml-2 pl-2 border-l border-slate-100 dark:border-white/5 space-y-1">
-                        {volume.chapters.length === 0 && (
-                            <div 
-                                onDragOver={(e) => onDragOver(e, volume)} 
-                                onDrop={(e) => onDrop(e, volume)}
-                                className={`text-xs text-slate-300 dark:text-slate-600 px-6 py-2 italic select-none ${isOver && dropPosition === 'INSIDE' ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}
-                            >
-                                空卷 (拖入章节)
-                            </div>
-                        )}
-                        {volume.chapters.map((ch) => (
-                            <SidebarItem 
-                                key={ch.id} 
-                                item={ch}
-                                activeChapterId={activeChapterId}
-                                onSelectChapter={onSelectChapter}
-                                onToggleVolume={onToggleVolume}
-                                onContextMenu={onContextMenu}
-                                dragState={dragState}
-                                onDragStart={onDragStart}
-                                onDragOver={onDragOver}
-                                onDragLeave={onDragLeave}
-                                onDrop={onDrop}
-                                editingItemId={editingItemId}
-                                editTitle={editTitle}
-                                setEditTitle={setEditTitle}
-                                saveEditing={saveEditing}
-                                onCreateChapter={onCreateChapter}
-                                onDeleteItem={onDeleteItem}
-                                parentId={volume.id}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    } else {
-        const chapter = item as Chapter;
-        const isActive = activeChapterId === chapter.id;
-        const isDraft = chapter.status === 'DRAFT';
-        const isReview = chapter.status === 'REVIEW';
-
-        // --- Style Logic ---
-        let baseStyle = "group relative flex items-center gap-3 px-4 py-3 text-sm text-left transition-all cursor-pointer select-none mx-3 mb-1 rounded-xl border overflow-hidden ";
-        
-        if (isActive) {
-            // 1. Active State (Highest Priority)
-            baseStyle += "bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold shadow-sm ring-1 ring-black/5 dark:ring-white/10 z-10 border-transparent scale-[1.02]";
-        } else if (isReview) {
-            // 2. Review State (Visible when not active) - Neutral Gray
-            baseStyle += "bg-gray-100 dark:bg-white/5 border-2 border-dashed border-gray-300 dark:border-slate-600 text-gray-500 dark:text-slate-300";
-        } else {
-            // 3. Normal State
-            baseStyle += "text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm hover:text-slate-900 dark:hover:text-slate-200 border-transparent hover:border-slate-100 dark:hover:border-white/5";
-        }
-
-        if (isDragging) {
-            baseStyle += " opacity-30 border-dashed border-indigo-300";
-        }
-
-        return (
-            <div
-                draggable
-                onDragStart={(e) => onDragStart(e, chapter)}
-                onDragOver={(e) => onDragOver(e, chapter)}
-                onDragLeave={onDragLeave}
-                onDrop={(e) => onDrop(e, chapter)}
-                onContextMenu={(e) => onContextMenu(e, chapter)}
-                className={baseStyle}
-                onClick={() => onSelectChapter(chapter.id)}
-            >
-                <DropIndicator />
-
-                {editingItemId === chapter.id ? (
-                    <input 
-                        autoFocus
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onBlur={saveEditing}
-                        onKeyDown={(e) => e.key === 'Enter' && saveEditing()}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded outline-none text-slate-800 dark:text-slate-100 select-text"
-                    />
-                ) : (
-                    <span className={`truncate select-none pointer-events-none flex-1 pr-12 ${isDraft ? 'text-slate-400 italic font-normal' : ''}`}>
-                        {chapter.title}
-                    </span>
-                )}
-
-                {!isDragging && !editingItemId && (
-                    <HoverActions 
-                        onAdd={() => onCreateChapter(parentId)}
-                        onDelete={() => onDeleteItem(chapter.id, 'CHAPTER')}
-                    />
-                )}
-            </div>
-        );
-    }
 };

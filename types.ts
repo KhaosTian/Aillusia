@@ -3,14 +3,11 @@ export type ViewMode = 'EDITOR' | 'OUTLINE' | 'WORLD' | 'RULES' | 'EVENTS' | 'TR
 
 export type Language = 'zh' | 'en';
 export type Theme = 'light' | 'dark';
-export type EditorFont = 'sans' | 'serif' | 'mono';
-
-export type ChapterStatus = 'NORMAL' | 'DRAFT' | 'REVIEW' | 'DONE';
 
 export interface WorldEntity {
   id: string;
   name: string;
-  aliases?: string[]; // New: Aliases for matching (e.g., ["Kyle", "The Doctor"])
+  aliases?: string[]; 
   type: 'CHARACTER' | 'SETTING' | 'ITEM' | 'LORE';
   description: string;
 }
@@ -28,6 +25,14 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface Idea {
+    id: string;
+    content: string;
+    status: 'INBOX' | 'PLANNED';
+    color?: string;
+    createdAt: number;
+}
+
 export interface SectionSnapshot {
   id: string;
   content: string;
@@ -42,57 +47,26 @@ export interface Section {
   snapshots?: SectionSnapshot[]; 
 }
 
+export interface SectionHandle {
+    undo: () => void;
+    redo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
+}
+
 export interface Chapter {
   id: string;
-  type: 'CHAPTER'; // Discriminator
+  type: 'CHAPTER'; 
   title: string;
   sections: Section[]; 
   outline: string;
-  localRules?: string; // New: Local rules specific to this chapter
+  ideas?: Idea[]; 
+  localRules?: string; 
   chatHistory: ChatMessage[];
   lastModified: number;
-  status: ChapterStatus; 
 }
 
-export interface Volume {
-  id: string;
-  type: 'VOLUME'; // Discriminator
-  title: string;
-  chapters: Chapter[];
-  collapsed: boolean;
-}
-
-export type NovelItem = Chapter | Volume;
-
-// --- Trash Types ---
-
-// 1. Deleted Section
-export interface DeletedSection extends Section {
-    type: 'SECTION'; // Discriminator for trash
-    deletedAt: number;
-    originChapterId: string;
-    originChapterTitle: string;
-}
-
-// 2. Deleted Entity (Wrapper to avoid type conflict if needed, or intersection)
-export interface DeletedWorldEntity extends WorldEntity {
-    trashType: 'ENTITY';
-    deletedAt: number;
-}
-
-// 3. Deleted Rule
-export interface DeletedRule extends Rule {
-    trashType: 'RULE';
-    deletedAt: number;
-}
-
-// Unified Trash Item
-export type TrashItem = 
-    | (Chapter & { deletedAt: number }) 
-    | (Volume & { deletedAt: number }) 
-    | DeletedSection
-    | DeletedWorldEntity
-    | DeletedRule;
+export type NovelItem = Chapter;
 
 export interface EventLog {
   id: string;
@@ -100,21 +74,46 @@ export interface EventLog {
   content: string;
 }
 
+export interface DeletedItemBase {
+    id: string;
+    deletedAt: number;
+}
+
+export interface DeletedSection extends DeletedItemBase {
+    content: string;
+    originChapterId: string;
+    originChapterTitle: string;
+    type: 'SECTION';
+}
+
+export interface DeletedWorldEntity extends WorldEntity, DeletedItemBase {
+    trashType: 'ENTITY'; 
+}
+
+export interface DeletedRule extends Rule, DeletedItemBase {
+    type: 'RULE';
+}
+
+export type DeletedChapter = Chapter & DeletedItemBase;
+
+export type TrashItem = DeletedChapter | DeletedSection | DeletedWorldEntity | DeletedRule;
+
 export interface Novel {
   id: string;
   title: string;
-  description: string; // Book summary
+  description: string; 
   coverColor: string;
-  coverImage?: string; // Base64 or URL for book cover
+  coverImage?: string; 
   globalOutline: string; 
+  globalIdeas?: Idea[]; 
   globalChatHistory: ChatMessage[]; 
-  items: NovelItem[]; 
-  chapters?: never; 
-  trash: TrashItem[]; // Updated to allow mixed types
+  items: Chapter[];
   activeChapterId: string;
   worldEntities: WorldEntity[];
   rules: Rule[];
+  trash: TrashItem[];
   createdAt: number;
+  importedAt?: number;
 }
 
 export interface AIState {
@@ -123,27 +122,6 @@ export interface AIState {
   lastResponse: string | null;
 }
 
-export interface WebDAVConfig {
-  enabled: boolean;
-  url: string;
-  username: string;
-  password: string;
-}
-
-export type AIProvider = 'gemini';
-
-export interface AIConfig {
-  provider: AIProvider;
-  apiKey: string;
-  modelName: string;
-}
-
-export interface VoiceConfig {
-  enabled: boolean;
-  language: string; // e.g., 'zh-CN', 'en-US'
-}
-
-// --- Debugging ---
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'ACTION';
 
 export interface LogEntry {
@@ -153,3 +131,24 @@ export interface LogEntry {
     message: string;
     details?: any;
 }
+
+export interface WebDAVConfig {
+    enabled: boolean;
+    url: string;
+    username?: string;
+    password?: string;
+}
+
+export interface AIConfig {
+    provider: string;
+    apiKey: string;
+    modelName?: string;
+    baseUrl?: string;
+}
+
+export interface VoiceConfig {
+    enabled: boolean;
+    language: string;
+}
+
+export type EditorFont = 'sans' | 'serif' | 'mono';

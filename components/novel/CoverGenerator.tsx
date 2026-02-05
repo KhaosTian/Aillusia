@@ -1,15 +1,13 @@
 
 import React, { useState, useRef } from 'react';
-import { AIConfig } from '../../types';
 import { SparklesIcon, UploadIcon, CameraIcon } from '../Icons';
 import { generateCoverImage } from '../../services/geminiService';
 
 interface CoverGeneratorProps {
-    aiConfig: AIConfig;
     onCoverGenerated: (base64: string) => void;
 }
 
-export const CoverGenerator: React.FC<CoverGeneratorProps> = ({ aiConfig, onCoverGenerated }) => {
+export const CoverGenerator: React.FC<CoverGeneratorProps> = ({ onCoverGenerated }) => {
     const [prompt, setPrompt] = useState('');
     const [style, setStyle] = useState('Cinematic');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -19,10 +17,10 @@ export const CoverGenerator: React.FC<CoverGeneratorProps> = ({ aiConfig, onCove
         if (!prompt.trim()) return;
         setIsGenerating(true);
         try {
-            const imgBase64 = await generateCoverImage(prompt, style, aiConfig);
+            const imgBase64 = await generateCoverImage(prompt, style);
             onCoverGenerated(imgBase64);
         } catch (e) {
-            alert("封面生成失败，请检查 API 设置。");
+            alert("封面生成失败，请检查网络或 API 设置。");
         } finally {
             setIsGenerating(false);
         }

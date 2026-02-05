@@ -11,16 +11,16 @@ interface ContextMenuState {
 
 export interface DragState {
     draggedId: string | null;
-    draggedType: 'CHAPTER' | 'VOLUME' | null;
-    draggedSource: 'TREE' | 'TRASH' | null; // New
+    draggedType: 'CHAPTER' | null;
+    draggedSource: 'TREE' | 'TRASH' | null;
     overId: string | null;
-    dropPosition: 'BEFORE' | 'AFTER' | 'INSIDE' | null; // Visual indicator position
+    dropPosition: 'BEFORE' | 'AFTER' | null; // Removed INSIDE
 }
 
 export const useSidebarState = (
     onRenameItem: (id: string, newTitle: string) => void,
-    onMoveItem: (draggedId: string, targetId: string | null, position: 'BEFORE' | 'AFTER' | 'INSIDE') => void,
-    onRestoreItemToLocation?: (id: string, targetId: string | null, position: 'BEFORE' | 'AFTER' | 'INSIDE') => void // New optional handler
+    onMoveItem: (draggedId: string, targetId: string | null, position: 'BEFORE' | 'AFTER') => void,
+    onRestoreItemToLocation?: (id: string, targetId: string | null, position: 'BEFORE' | 'AFTER') => void
 ) => {
     // Editing State
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -95,23 +95,8 @@ export const useSidebarState = (
         const y = e.clientY - rect.top;
         const height = rect.height;
         
-        let position: 'BEFORE' | 'AFTER' | 'INSIDE' = 'AFTER';
-
-        // Logic for determining drop position
-        if (targetItem.type === 'VOLUME') {
-            // Volume logic: Top 25% -> Before, Bottom 25% -> After, Middle -> Inside
-            // Note: If dragged item is a Volume, it can't go INSIDE another volume (usually)
-            if (dragState.draggedType === 'VOLUME') {
-                position = y < height / 2 ? 'BEFORE' : 'AFTER';
-            } else {
-                if (y < height * 0.25) position = 'BEFORE';
-                else if (y > height * 0.75) position = 'AFTER';
-                else position = 'INSIDE';
-            }
-        } else {
-            // Chapter logic: Top 50% -> Before, Bottom 50% -> After
-            position = y < height / 2 ? 'BEFORE' : 'AFTER';
-        }
+        // Simple logic: Top 50% -> Before, Bottom 50% -> After
+        const position = y < height / 2 ? 'BEFORE' : 'AFTER';
 
         setDragState(prev => ({
             ...prev,
@@ -122,7 +107,6 @@ export const useSidebarState = (
 
     const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault();
-        // Optional: Clear if leaving the entire list, but usually dragOver overrides this quickly
     };
 
     const handleDrop = (e: React.DragEvent, targetItem: NovelItem) => {

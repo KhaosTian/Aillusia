@@ -1,9 +1,7 @@
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Section, SectionSnapshot } from '../../types';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { Section, SectionSnapshot, EditorFont, SectionHandle } from '../../types';
 import { SectionToolbar } from './SectionToolbar';
-import { SectionHistoryModal } from './SectionHistoryModal';
-import { SectionProofreadModal } from './SectionProofreadModal';
 import { toast } from '../../services/toast';
 import { GripVerticalIcon } from '../Icons';
 
@@ -16,9 +14,6 @@ interface SectionEditorProps {
     onSnapshotUpdate: (id: string, snapshots: SectionSnapshot[]) => void;
     onDelete: (id: string) => void;
     currentT: any;
-    fontClass: string;
-    fontSize: number;
-    // Drag Props
     isDragging?: boolean;
     isDragOver?: boolean;
     dropPosition?: 'BEFORE' | 'AFTER' | null;
@@ -26,126 +21,37 @@ interface SectionEditorProps {
     onDragOver?: (e: React.DragEvent, id: string) => void;
     onDrop?: (e: React.DragEvent, id: string) => void;
     isSortMode?: boolean; 
+    fontFamily: EditorFont;
+    fontSize: number;
 }
 
-const MAX_SNAPSHOTS = 20;
-const AUTO_SAVE_CHAR_THRESHOLD = 50;
-
-// Wrapped in React.memo to prevent unnecessary re-renders during parent state updates (like Drag & Drop)
-export const SectionEditor = React.memo<SectionEditorProps>(({ 
+export const SectionEditor: React.FC<SectionEditorProps> = React.memo(({ 
     section, 
     index, 
     isActive, 
     onFocus, 
     onUpdate, 
-    onSnapshotUpdate, 
     onDelete, 
     currentT, 
-    fontClass, 
-    fontSize,
     isDragging,
     isDragOver,
     dropPosition,
     onDragStart,
     onDragOver,
     onDrop,
-    isSortMode
+    isSortMode,
+    fontFamily,
+    fontSize
 }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const [past, setPast] = useState<string[]>([]);
-    const [future, setFuture] = useState<string[]>([]);
-    const typingSnapshotRef = useRef<string | null>(null);
-    const debounceTimeoutRef = useRef<any>(null);
-    const lastAutoSaveContent = useRef<string>(section.content);
     const [isCopied, setIsCopied] = useState(false);
     
-    // Modals state
-    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-    const [isProofreadModalOpen, setIsProofreadModalOpen] = useState(false);
-
     useEffect(() => {
         if (!isSortMode && textareaRef.current) {
             textareaRef.current.style.height = 'auto';
             textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
         }
-    }, [section.content, fontSize, isSortMode]);
-
-    useEffect(() => {
-        if (isSortMode) return; 
-        const intervalId = setInterval(() => {
-            const currentContent = section.content;
-            const lastContent = lastAutoSaveContent.current;
-            const lengthDiff = Math.abs(currentContent.length - lastContent.length);
-
-            if (currentContent !== lastContent && 
-                currentContent.trim() !== "" && 
-                lengthDiff > AUTO_SAVE_CHAR_THRESHOLD) {
-                
-                const newSnap: SectionSnapshot = {
-                    id: `snap-auto-${Date.now()}`,
-                    content: currentContent,
-                    timestamp: Date.now(),
-                    type: 'AUTO'
-                };
-                
-                let currentSnaps = section.snapshots || [];
-                const merged = [newSnap, ...currentSnaps].sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_SNAPSHOTS);
-                
-                onSnapshotUpdate(section.id, merged);
-                lastAutoSaveContent.current = currentContent;
-            }
-        }, 60000); 
-
-        return () => clearInterval(intervalId);
-    }, [section.content, section.snapshots, onSnapshotUpdate, section.id, isSortMode]); 
-
-    const handleTakeSnapshot = () => {
-        const newSnap: SectionSnapshot = {
-            id: `snap-manual-${Date.now()}`,
-            content: section.content,
-            timestamp: Date.now(),
-            type: 'MANUAL'
-        };
-        const currentSnaps = section.snapshots || [];
-        const merged = [newSnap, ...currentSnaps].sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_SNAPSHOTS);
-        onSnapshotUpdate(section.id, merged);
-        lastAutoSaveContent.current = section.content;
-        toast.success(currentT.snapshotTaken);
-    };
-
-    const handleRestoreSnapshot = (content: string) => {
-        if (section.content.trim() !== "") {
-             const backupSnap: SectionSnapshot = {
-                id: `snap-backup-${Date.now()}`,
-                content: section.content,
-                timestamp: Date.now(),
-                type: 'AUTO'
-            };
-            const currentSnaps = section.snapshots || [];
-            const merged = [backupSnap, ...currentSnaps].sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_SNAPSHOTS);
-            onSnapshotUpdate(section.id, merged);
-        }
-
-        handleLocalChange(content);
-        lastAutoSaveContent.current = content; 
-        toast.info(currentT.restoreVersion);
-    };
-
-    const handleApplyProofread = (newContent: string) => {
-        if (newContent && newContent !== section.content) {
-            if (section.content.trim() !== "") {
-                const backupSnap: SectionSnapshot = {
-                   id: `snap-pre-proof-${Date.now()}`,
-                   content: section.content,
-                   timestamp: Date.now(),
-                   type: 'AUTO'
-               };
-               const currentSnaps = section.snapshots || [];
-               onSnapshotUpdate(section.id, [backupSnap, ...currentSnaps].slice(0, MAX_SNAPSHOTS));
-           }
-           handleLocalChange(newContent);
-        }
-    };
+    }, [section.content, isSortMode, fontFamily, fontSize]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(section.content);
@@ -155,52 +61,12 @@ export const SectionEditor = React.memo<SectionEditorProps>(({
     };
 
     const handleLocalChange = (newVal: string) => {
-        if (typingSnapshotRef.current === null) {
-            typingSnapshotRef.current = section.content;
-        }
         onUpdate(section.id, newVal);
-        if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-        debounceTimeoutRef.current = setTimeout(() => {
-            if (typingSnapshotRef.current !== null && typingSnapshotRef.current !== newVal) {
-                setPast(p => [...p, typingSnapshotRef.current!]);
-                setFuture([]);
-                typingSnapshotRef.current = null;
-            }
-        }, 1000);
     };
 
-    const handleUndo = () => {
-        if (typingSnapshotRef.current !== null) {
-            const snapshot = typingSnapshotRef.current;
-            typingSnapshotRef.current = null;
-            if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-            onUpdate(section.id, snapshot);
-            return;
-        }
-        if (past.length === 0) return;
-        const previous = past[past.length - 1];
-        setPast(past.slice(0, -1));
-        setFuture(f => [section.content, ...f]);
-        onUpdate(section.id, previous);
-    };
+    // Note: Global Undo/Redo is handled by parent, so no Ctrl+Z handler here.
 
-    const handleRedo = () => {
-        if (future.length === 0) return;
-        const next = future[0];
-        setPast(p => [...p, section.content]);
-        setFuture(future.slice(1));
-        onUpdate(section.id, next);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
-            e.preventDefault();
-            e.shiftKey ? handleRedo() : handleUndo();
-        }
-    };
-
-    const canUndo = past.length > 0 || typingSnapshotRef.current !== null;
-    const canRedo = future.length > 0;
+    const fontClass = fontFamily === 'mono' ? 'font-mono' : (fontFamily === 'sans' ? 'font-sans' : 'font-serif');
 
     return (
         <div 
@@ -229,17 +95,9 @@ export const SectionEditor = React.memo<SectionEditorProps>(({
             {!isSortMode && (
                 <SectionToolbar 
                     index={index}
-                    canUndo={canUndo}
-                    canRedo={canRedo}
-                    onUndo={handleUndo}
-                    onRedo={handleRedo}
                     onCopy={handleCopy}
                     isCopied={isCopied}
-                    onProofread={() => setIsProofreadModalOpen(true)}
-                    isProofreading={false} 
                     onDelete={() => onDelete(section.id)}
-                    onTakeSnapshot={handleTakeSnapshot}
-                    onOpenHistory={() => setIsHistoryModalOpen(true)}
                     currentT={currentT}
                 />
             )}
@@ -271,7 +129,6 @@ export const SectionEditor = React.memo<SectionEditorProps>(({
                         ref={textareaRef} 
                         value={section.content} 
                         onChange={(e) => handleLocalChange(e.target.value)} 
-                        onKeyDown={handleKeyDown} 
                         onFocus={() => onFocus(section.id)}
                         placeholder={`...`} 
                         className={`w-full h-full resize-none bg-transparent border-none outline-none focus:outline-none ring-0 focus:ring-0 leading-relaxed text-slate-700 dark:text-[#c9d1d9] placeholder-slate-200 dark:placeholder-[#30363d] overflow-hidden ${fontClass} block pl-2`} 
@@ -280,23 +137,6 @@ export const SectionEditor = React.memo<SectionEditorProps>(({
                     />
                 )}
             </div>
-
-            <SectionHistoryModal 
-                isOpen={isHistoryModalOpen}
-                onClose={() => setIsHistoryModalOpen(false)}
-                snapshots={section.snapshots || []}
-                currentContent={section.content}
-                onRestore={handleRestoreSnapshot}
-                currentT={currentT}
-            />
-
-            <SectionProofreadModal 
-                isOpen={isProofreadModalOpen}
-                onClose={() => setIsProofreadModalOpen(false)}
-                originalContent={section.content}
-                onApply={handleApplyProofread}
-                currentT={currentT}
-            />
         </div>
     );
 });

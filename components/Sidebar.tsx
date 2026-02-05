@@ -1,52 +1,41 @@
 
 import React, { useState } from 'react';
-import { Novel, ViewMode, Language, ChapterStatus } from '../types';
-import { logger } from '../services/logger';
-import { t } from '../locales';
-import { TrashIcon, LibraryIcon } from './Icons';
+import { Novel, ViewMode, Language, Chapter } from '../types';
 import { SidebarItem } from './sidebar/SidebarItem';
 import { SidebarContextMenu } from './sidebar/SidebarContextMenu';
-import { SidebarTrashList } from './sidebar/SidebarTrashList';
 import { useSidebarState } from '../hooks/useSidebarState';
+import { PlusIcon, PanelLeftCloseIcon } from './Icons';
+import { t } from '../locales';
 
 interface SidebarProps {
   novel: Novel;
   activeView: ViewMode;
   onSelectChapter: (id: string) => void;
-  onMoveItem: (draggedId: string, targetId: string | null, position: 'BEFORE' | 'AFTER' | 'INSIDE') => void;
+  onMoveItem: (draggedId: string, targetId: string | null, position: 'BEFORE' | 'AFTER') => void;
   onRenameItem: (id: string, newTitle: string) => void;
-  onUpdateChapterStatus?: (id: string, status: ChapterStatus) => void;
-  onCreateChapter: (parentId: string | null) => void;
-  onCreateVolume: () => void;
-  onDeleteItem: (id: string, type: 'CHAPTER' | 'VOLUME') => void;
-  onToggleVolume: (id: string) => void;
-  onBackToBookshelf: () => void;
+  onCreateChapter: () => void;
+  onDeleteItem: (id: string) => void;
   language: Language;
-  onRestoreItem: (id: string) => void; 
-  onPermanentDeleteItem: (id: string) => void; 
-  onRestoreItemToLocation?: (id: string, targetId: string | null, position: 'BEFORE' | 'AFTER' | 'INSIDE') => void; 
+  isOpen: boolean;
+  onClose: () => void;
+  onScrollToSection?: (sectionId: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
   novel, 
-  activeView,
   onSelectChapter,
   onMoveItem,
   onRenameItem,
-  onUpdateChapterStatus,
   onCreateChapter,
-  onCreateVolume,
   onDeleteItem,
-  onToggleVolume,
-  onBackToBookshelf,
   language,
-  onRestoreItem,
-  onPermanentDeleteItem,
-  onRestoreItemToLocation
+  isOpen,
+  onClose,
+  onScrollToSection
 }) => {
+  const [activeTab, setActiveTab] = useState<'CHAPTERS' | 'EVENTS'>('CHAPTERS');
   const currentT = t[language];
-  const [viewMode, setViewMode] = useState<'TREE' | 'TRASH'>('TREE');
-
+  
   const {
       editingItemId,
       editTitle,
@@ -63,100 +52,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setContextMenu,
       handleItemContextMenu,
       handleBackgroundContextMenu
-  } = useSidebarState(onRenameItem, onMoveItem, onRestoreItemToLocation);
+  } = useSidebarState(onRenameItem, onMoveItem);
 
-  const trashCount = novel.trash.filter(i => 'type' in i && (i.type === 'CHAPTER' || i.type === 'VOLUME')).length;
-
-  // --- Drag on Tab Handlers ---
-  const handleTabDragOver = (e: React.DragEvent, targetView: 'TREE' | 'TRASH') => {
-      e.preventDefault();
-      
-      if (dragState.draggedSource === 'TREE' && targetView === 'TRASH') {
-          e.dataTransfer.dropEffect = 'move';
-      } 
-      
-      if (dragState.draggedSource === 'TRASH' && targetView === 'TREE') {
-          if (viewMode !== 'TREE') setViewMode('TREE');
-          e.dataTransfer.dropEffect = 'move';
-      }
-  };
-
-  const handleTabDrop = (e: React.DragEvent, targetView: 'TREE' | 'TRASH') => {
-      e.preventDefault();
-      
-      // Delete if dropping tree item onto trash tab
-      if (dragState.draggedSource === 'TREE' && targetView === 'TRASH' && dragState.draggedId && dragState.draggedType) {
-          onDeleteItem(dragState.draggedId, dragState.draggedType);
-      }
-  };
+  const currentChapter = novel.items.find(i => i.id === novel.activeChapterId) as Chapter | undefined;
 
   return (
     <>
         <div 
-            className="w-80 flex flex-col h-full bg-[#fbfbfb] dark:bg-[#0d1117] border-r border-slate-200/60 dark:border-white/5 shadow-[4px_0_24px_rgba(0,0,0,0.01)] select-none relative z-30 transition-all"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDropOnRoot}
-            onContextMenu={handleBackgroundContextMenu}
+            className="flex flex-col h-full bg-white dark:bg-[#161b22] select-none relative z-30 overflow-hidden"
+            onContextMenu={activeTab === 'CHAPTERS' ? handleBackgroundContextMenu : undefined}
         >
-            {/* Header Area */}
-            <div className="flex flex-col px-4 pt-6 pb-4 shrink-0 bg-transparent gap-4">
-                {/* Title */}
-                <div className="flex flex-col justify-center overflow-hidden w-full px-2 mt-2">
-                    <h2 className="font-ui font-extrabold text-slate-900 dark:text-white text-xl truncate leading-tight" title={novel.title}>
-                        {novel.title}
-                    </h2>
-                </div>
-
-                {/* Segmented Control (Directory / Trash) */}
-                <div className="bg-slate-100 dark:bg-white/5 p-1 rounded-xl flex relative">
+            {/* Header: Title & Close */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-2 shrink-0">
+                <h2 className="font-bold text-slate-900 dark:text-white text-base truncate flex-1 font-ui tracking-tight" title={novel.title}>
+                    {novel.title}
+                </h2>
+                <button 
+                    onClick={onClose}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                    title="收起侧栏"
+                >
+                    <PanelLeftCloseIcon className="w-4 h-4" />
+                </button>
+            </div>
+            
+            {/* Segmented Control */}
+            <div className="px-4 pb-2 shrink-0">
+                <div className="flex bg-slate-100 dark:bg-[#21262d] p-1 rounded-lg relative">
                     <button
-                        onClick={() => setViewMode('TREE')}
-                        onDragOver={(e) => handleTabDragOver(e, 'TREE')}
-                        onDrop={(e) => handleTabDrop(e, 'TREE')}
+                        onClick={() => setActiveTab('CHAPTERS')}
                         className={`
-                            flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all z-10
-                            ${viewMode === 'TREE' 
-                                ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' 
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}
+                            flex-1 py-1 rounded-md text-[11px] font-bold text-center transition-all z-10
+                            ${activeTab === 'CHAPTERS' 
+                                ? 'bg-white dark:bg-[#30363d] text-slate-800 dark:text-white shadow-sm ring-1 ring-black/5' 
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}
                         `}
                     >
-                        <LibraryIcon className="w-3.5 h-3.5" />
                         {currentT.chapters}
                     </button>
                     <button
-                        onClick={() => setViewMode('TRASH')}
-                        onDragOver={(e) => handleTabDragOver(e, 'TRASH')}
-                        onDrop={(e) => handleTabDrop(e, 'TRASH')}
+                        onClick={() => setActiveTab('EVENTS')}
                         className={`
-                            flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-bold rounded-lg transition-all z-10
-                            ${viewMode === 'TRASH' 
-                                ? 'bg-rose-500 text-white shadow-sm' 
-                                : 'text-slate-500 dark:text-slate-400 hover:text-rose-500'}
-                            ${dragState.draggedSource === 'TREE' && dragState.draggedId ? 'animate-pulse ring-2 ring-rose-300' : ''}
+                            flex-1 py-1 rounded-md text-[11px] font-bold text-center transition-all z-10
+                            ${activeTab === 'EVENTS' 
+                                ? 'bg-white dark:bg-[#30363d] text-slate-800 dark:text-white shadow-sm ring-1 ring-black/5' 
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}
                         `}
                     >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                        {currentT.chapterTrash}
-                        {trashCount > 0 && <span className="bg-black/20 px-1.5 rounded-full text-[10px]">{trashCount}</span>}
+                        {currentT.events}
                     </button>
                 </div>
             </div>
 
-            {/* List Content */}
-            <div className="flex-1 overflow-y-auto py-2 custom-scrollbar px-3 pb-6">
-                
-                {viewMode === 'TREE' ? (
-                    <>
-                        {novel.items.map((item, index) => (
+            {/* Content Area */}
+            <div 
+                className="flex-1 overflow-y-auto py-2 custom-scrollbar px-3 pb-6"
+                onDragOver={activeTab === 'CHAPTERS' ? (e) => e.preventDefault() : undefined}
+                onDrop={activeTab === 'CHAPTERS' ? handleDropOnRoot : undefined}
+            >
+                {activeTab === 'CHAPTERS' ? (
+                    <div className="space-y-0.5">
+                        {novel.items.map((item) => (
                             <SidebarItem 
                                 key={item.id}
                                 item={item}
                                 activeChapterId={novel.activeChapterId}
                                 onSelectChapter={onSelectChapter}
-                                onToggleVolume={onToggleVolume}
                                 onContextMenu={handleItemContextMenu}
                                 dragState={dragState}
-                                onDragStart={(e, i) => handleDragStart(e, i, 'TREE')}
+                                onDragStart={(e, i) => handleDragStart(e, i)}
                                 onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
@@ -166,21 +130,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 saveEditing={saveEditing}
                                 onCreateChapter={onCreateChapter}
                                 onDeleteItem={onDeleteItem}
-                                parentId={null}
                             />
                         ))}
                         
-                        {/* Empty Space Drop Target */}
-                        <div className="h-20" onDragOver={(e) => handleDragOver(e, { id: 'root-end', type: 'CHAPTER' } as any)} onDrop={handleDropOnRoot}></div>
-                    </>
+                        {/* New Chapter Button (Refined) */}
+                        <div className="pt-2 px-1">
+                            <button 
+                                onClick={onCreateChapter}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 bg-slate-50/30 dark:bg-white/5 hover:bg-slate-50 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all text-xs font-medium group"
+                            >
+                                <PlusIcon className="w-3.5 h-3.5 opacity-70 group-hover:scale-110 transition-transform" />
+                                {currentT.newChapter}
+                            </button>
+                        </div>
+
+                        {dragState.draggedId && (
+                            <div className="h-10 rounded-lg border border-dashed border-indigo-300/50 dark:border-indigo-700/50 bg-indigo-50/20 dark:bg-indigo-900/10 m-1 flex items-center justify-center text-indigo-400 text-[10px] font-bold">
+                                移动到底部
+                            </div>
+                        )}
+                    </div>
                 ) : (
-                    <SidebarTrashList 
-                        trash={novel.trash} 
-                        onRestore={onRestoreItem} 
-                        onPermanentDelete={onPermanentDeleteItem} 
-                        currentT={currentT}
-                        onDragStart={(e, i) => handleDragStart(e, i, 'TRASH')}
-                    />
+                    /* Redesigned Event Timeline */
+                    <div className="pl-3 pr-1 pt-2">
+                        {!currentChapter ? (
+                            <div className="text-center text-slate-400 text-xs py-10">请先选择章节</div>
+                        ) : (
+                            <div className="relative border-l-2 border-slate-100 dark:border-white/5 ml-3 space-y-6 pb-10">
+                                <div className="pl-6 pb-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 dark:bg-[#21262d] px-2 py-0.5 rounded-full">
+                                        {currentChapter.title}
+                                    </span>
+                                </div>
+                                {currentChapter.sections.map((sec, idx) => (
+                                    <div key={sec.id} className="relative pl-6 group">
+                                        {/* Timeline Node */}
+                                        <div 
+                                            className={`
+                                                absolute -left-[5px] top-2.5 w-2.5 h-2.5 rounded-full z-10 transition-all
+                                                bg-white dark:bg-[#161b22] border-2 border-slate-300 dark:border-slate-600
+                                                group-hover:border-indigo-500 group-hover:scale-110
+                                            `}
+                                        ></div>
+                                        
+                                        <div className="cursor-pointer" onClick={() => onScrollToSection && onScrollToSection(sec.id)}>
+                                            <div className="text-[11px] font-bold mb-1.5 text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors flex items-center gap-2">
+                                                {currentT.section.replace('{n}', (idx + 1).toString())}
+                                                <div className="h-px bg-slate-100 dark:bg-white/5 flex-1"></div>
+                                            </div>
+                                            
+                                            {/* Events Card */}
+                                            {(sec.events || []).length > 0 ? (
+                                                <div className="bg-slate-50 dark:bg-[#21262d] p-3 rounded-xl border border-slate-100 dark:border-white/5 group-hover:border-indigo-200 dark:group-hover:border-indigo-800/50 transition-colors">
+                                                    <ul className="space-y-2">
+                                                        {sec.events.map((evt: string, eIdx: number) => (
+                                                            <li key={eIdx} className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed relative pl-2">
+                                                                <span className="absolute left-0 top-1.5 w-1 h-1 rounded-full bg-indigo-400"></span>
+                                                                {evt}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-slate-300 italic pl-1">...</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {currentChapter.sections.length === 0 && (
+                                    <div className="pl-6 text-xs text-slate-400 italic">暂无内容</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         </div>
@@ -188,17 +210,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <SidebarContextMenu 
             contextMenu={contextMenu}
             onClose={() => setContextMenu(null)}
-            onCreateVolume={onCreateVolume}
             onCreateChapter={onCreateChapter}
             onStartEditing={startEditing}
-            onSetStatus={(c, s) => {
-                if (onUpdateChapterStatus) {
-                    onUpdateChapterStatus(c.id, s);
-                    logger.action('Updated chapter status', { id: c.id, status: s });
-                }
-            }}
             onDeleteItem={onDeleteItem}
-            currentT={currentT}
+            currentT={currentT} 
         />
     </>
   );

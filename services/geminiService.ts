@@ -1,262 +1,77 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { Chapter, Rule, WorldEntity, EventLog, ChatMessage, AIConfig } from "../types";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { Chapter, Rule, WorldEntity, EventLog, ChatMessage } from "../types";
 
-// Helper to create a client with dynamic key
-const getClient = (apiKey?: string) => {
-    // Priority: Explicit key > Environment variable
-    const key = apiKey || process.env.API_KEY;
-    if (!key) throw new Error("API Key not found");
+// Helper to create a client
+const getClient = () => {
+    const key = process.env.API_KEY;
+    if (!key) throw new Error("API Key not found in environment variables.");
     return new GoogleGenAI({ apiKey: key });
 };
 
-// Helper to format context (Exported for Context Browser)
-export const getContextPreview = (
-  worldEntities: WorldEntity[], 
-  rules: Rule[], 
-  events: EventLog[],
-  globalOutline: string = "",
-  chapterOutline: string = "",
-  localRules: string = "", // New Parameter
-  previousContent: string = "",
-  chapterTitle: string = ""
-) => {
-  const activeRules = rules.filter(r => r.isActive).map(r => `- ${r.content}`).join('\n');
-  const worldContext = worldEntities.map(w => `${w.name} [${(w.aliases || []).join(', ')}]: ${w.description}`).join('\n');
-  const eventTimeline = events.map(e => `- ${e.content}`).join('\n');
-  
-  return `=== 1. 全局核心约束 (GLOBAL RULES) ===
-${activeRules || "无特殊限制。"}
-
-=== 2. 本章特别规则 (CHAPTER LOCAL RULES) ===
-${localRules || "无本章特别约束。"}
-
-=== 3. 世界观设定 (WORLD DATABASE) ===
-${worldContext || "无详细设定。"}
-
-=== 4. 全局故事大纲 (GLOBAL OUTLINE) ===
-${globalOutline || "暂无全局大纲。"}
-
-=== 5. 当前章节大纲 (CHAPTER OUTLINE) ===
-${chapterOutline || "本章暂无大纲。"}
-
-=== 6. 事件时间轴 (EVENTS - AI 智能检索) ===
-${eventTimeline || "暂无事件记录。"}
-
-=== 7. 前文情境 (PREVIOUS CONTEXT) ===
-"""
-${previousContent || "（无前文或正文回溯窗口为0）"}
-"""
-
-=== 8. 当前任务 ===
-章节: ${chapterTitle}
-`;
-};
-
-// --- Connection Test ---
-export const testAIConnection = async (config: AIConfig): Promise<boolean> => {
+export const testAIConnection = async (config: { apiKey: string }) => {
+    if (!config.apiKey) throw new Error("API Key is missing");
+    const ai = new GoogleGenAI({ apiKey: config.apiKey });
     try {
-        const ai = getClient(config.apiKey);
-        // Use a lightweight model for testing if possible, or the user specified one
-        const model = config.modelName || 'gemini-3-flash-preview';
         await ai.models.generateContent({
-            model: model,
-            contents: "Hi",
+            model: 'gemini-3-flash-preview',
+            contents: 'Test connection',
         });
         return true;
     } catch (e) {
-        console.error("Connection Test Failed:", e);
+        console.error("AI Connection Test Failed", e);
         throw e;
     }
 };
 
-// --- Streaming Story Generation ---
-export const streamStoryContent = async function* (
-  prompt: string,
-  chapter: Chapter,
-  previousContent: string,
-  worldEntities: WorldEntity[],
-  rules: Rule[],
-  events: EventLog[],
-  globalOutline: string, 
-  aiConfig?: AIConfig // Accept config
-) {
-  const ai = getClient(aiConfig?.apiKey);
-  const preview = getContextPreview(
-      worldEntities, 
-      rules, 
-      events, 
-      globalOutline, 
-      chapter.outline,
-      chapter.localRules, // Pass local rules
-      previousContent, 
-      chapter.title
-  );
-
-  const fullPrompt = `
-    你是一位专业的网文小说家。请根据提供的上下文撰写小说正文。
-    请使用中文进行创作。
-    
-    ${preview}
-    
-    === 用户指令 ===
-    ${prompt}
-    
-    要求：
-    1. 风格统一，逻辑严密，严格遵守设定。
-    2. 承接前文情境，不要出现断层。
-    3. 特别注意遵守“本章特别规则”。
-    4. 只输出正文，不要包含解释。
-  `;
-
+// Retry wrapper with exponential backoff
+const retryWithBackoff = async <T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 2000
+): Promise<T> => {
   try {
-    const responseStream = await ai.models.generateContentStream({
-      model: aiConfig?.modelName || 'gemini-3-flash-preview',
-      contents: fullPrompt,
-      config: {
-        thinkingConfig: { thinkingBudget: 0 }
-      }
-    });
+    return await fn();
+  } catch (error: any) {
+    const isRateLimit = 
+      error?.status === 429 || 
+      error?.code === 429 || 
+      error?.message?.includes('429') ||
+      error?.status === 'RESOURCE_EXHAUSTED' ||
+      error?.error?.code === 429 ||
+      error?.error?.status === 'RESOURCE_EXHAUSTED';
 
-    for await (const chunk of responseStream) {
-       yield chunk.text;
+    if (isRateLimit && retries > 0) {
+      console.warn(`API Rate Limit hit. Retrying in ${delay}ms... (Attempts left: ${retries})`);
+      await new Promise(r => setTimeout(r, delay));
+      return retryWithBackoff(fn, retries - 1, delay * 2);
     }
-
-  } catch (error) {
-    console.error("Gemini Streaming Error:", error);
-    throw new Error("生成失败，请重试。");
+    throw error;
   }
 };
 
-// --- Outline Chat Discussion ---
-export const streamOutlineChat = async function* (
-    userMessage: string,
-    history: ChatMessage[],
-    chapterTitle: string,
-    worldEntities: WorldEntity[],
-    rules: Rule[],
-    events: EventLog[],
-    globalOutline: string,
-    previousContent: string,
-    aiConfig?: AIConfig
-) {
-    const ai = getClient(aiConfig?.apiKey);
-    // Reuse format logic where possible, but chat needs a specific persona prompt
-    const { worldContext } = { worldContext: worldEntities.map(w => `${w.name} (${w.type}): ${w.description}`).join('\n') };
-    const activeRules = rules.filter(r => r.isActive).map(r => `- ${r.content}`).join('\n');
-    const eventTimeline = events.map(e => `- ${e.content}`).join('\n');
-
-    const systemPrompt = `
-    你是一位专业的小说大纲策划顾问。你正在与作者讨论章节 "${chapterTitle}" 的剧情。
+// --- Chapter Analysis ---
+export const analyzeChapterContent = async (text: string, existingEntities: WorldEntity[]) => {
+    const ai = getClient();
+    // Limit existing entities context to avoid token overflow
+    const entitiesContext = existingEntities.map(e => e.name).slice(0, 100).join(', ');
     
-    === 上下文参考 ===
-    1. 世界观: 
-    ${worldContext}
-    
-    2. 全局大纲:
-    ${globalOutline}
-    
-    3. 事件流:
-    ${eventTimeline}
-    
-    4. 写作规则:
-    ${activeRules}
-    
-    5. 前文情境:
-    """
-    ${previousContent || "无前文。"}
-    """
-    
-    请以对话的方式帮助作者构思情节。
-    
-    **重要：如果你想向用户提供几个剧情发展选项，请务必使用以下格式包裹选项JSON：**
-    :::choices
-    ["选项一", "选项二"]
-    :::
-    除选项外，请正常对话。
-    `;
-    
-    const conversation = history.map(h => `${h.role === 'user' ? '作者' : 'AI策划'}: ${h.text}`).join('\n');
-    
-    const fullInput = `
-    ${systemPrompt}
-    === 历史对话 ===
-    ${conversation}
-    作者: ${userMessage}
-    AI策划: 
-    `;
-
-    try {
-        const responseStream = await ai.models.generateContentStream({
-            model: aiConfig?.modelName || 'gemini-3-flash-preview',
-            contents: fullInput
-        });
-        
-        for await (const chunk of responseStream) {
-            yield chunk.text;
-        }
-    } catch (e) {
-        console.error(e);
-        throw e;
-    }
-};
-
-// --- Extract Outline from Chat ---
-export const generateOutlineFromChat = async (
-    history: ChatMessage[],
-    chapterTitle: string,
-    aiConfig?: AIConfig
-): Promise<string> => {
-    const ai = getClient(aiConfig?.apiKey);
-    const conversation = history.map(h => `${h.role === 'user' ? '作者' : 'AI策划'}: ${h.text}`).join('\n');
-    
-    try {
-        const response = await ai.models.generateContent({
-            model: aiConfig?.modelName || 'gemini-3-flash-preview',
-            contents: `
-            阅读以下关于章节 "${chapterTitle}" 的策划讨论记录：
-            ${conversation}
-            请总结并生成一份结构清晰的Markdown格式章节大纲。
-            `
-        });
-        return response.text || "";
-    } catch (e) {
-        return "大纲提取失败。";
-    }
-};
-
-// --- Analyze Chapter Content (Entities Only) ---
-export const analyzeChapterContent = async (
-    content: string,
-    existingEntities: WorldEntity[],
-    aiConfig?: AIConfig
-) => {
-    const ai = getClient(aiConfig?.apiKey);
-    const existingNames = existingEntities.map(e => e.name).join(', ');
-
     const prompt = `
-    分析以下小说章节内容。提取**新出现**的或**发生重大变化**的角色、地点、物品。
-    
-    已知设定: ${existingNames}
-    
-    **关键规则：**
-    1. 【严禁翻译】：如果原文是中文名，不要加英文括号。必须与原文**完全一致**。
-    2. 【严禁多余备注】：不要把职业、身份写在名字里（例如“义体医生凯尔”错误，应为“凯尔”）。
-    3. 【提取别名】：如果一个角色有多个称呼，请将其他称呼放入 aliases 列表。
-    4. 【去重】：如果实体已在“已知设定”中，且没有重大变化，请不要重复提取。
-    
-    请返回 JSON 格式。
-    
-    === 小说正文 ===
-    ${content}
+    Analyze the following novel chapter content.
+    Identify NEW World Entities (Characters, Settings, Items, Lore) that appear for the first time or are significant.
+    Compare with existing entities: ${entitiesContext}.
+    Do NOT return existing entities unless they have major updates.
+
+    Content:
+    ${text.slice(0, 30000)}
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: aiConfig?.modelName || 'gemini-3-flash-preview',
+        const response = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
+                responseMimeType: 'application/json',
                 responseSchema: {
                     type: Type.OBJECT,
                     properties: {
@@ -265,140 +80,228 @@ export const analyzeChapterContent = async (
                             items: {
                                 type: Type.OBJECT,
                                 properties: {
-                                    name: { type: Type.STRING, description: "EXACT text from story. No translations." },
-                                    aliases: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Other names used in text" },
-                                    type: { type: Type.STRING, description: "CHARACTER, SETTING, or ITEM" },
+                                    name: { type: Type.STRING },
+                                    type: { type: Type.STRING, enum: ['CHARACTER', 'SETTING', 'ITEM', 'LORE'] },
                                     description: { type: Type.STRING }
-                                },
-                                required: ["name", "type", "description"]
+                                }
                             }
                         }
-                    },
-                    required: ["newEntities"]
+                    }
                 }
             }
-        });
+        })) as GenerateContentResponse;
         
-        return JSON.parse(response.text || "{}");
+        return JSON.parse(response.text || '{ "newEntities": [] }');
     } catch (e) {
         console.error("Analysis failed", e);
-        throw new Error("分析失败");
+        return { newEntities: [] };
     }
 };
 
-// --- Generate Section Summary (Event List) ---
-export const summarizeSectionForEvent = async (
-    sectionContent: string,
-    aiConfig?: AIConfig
-): Promise<string[]> => {
-    if (!sectionContent || sectionContent.length < 50) return [];
-    
-    const ai = getClient(aiConfig?.apiKey);
+// --- Event Summarization ---
+export const summarizeSectionForEvent = async (text: string): Promise<string[]> => {
+    const ai = getClient();
     const prompt = `
-    请分析以下小说片段，提取出所有的**关键剧情事件**（Event List）。
+    Summarize the key plot events in this section of a novel.
+    Return a list of short, concise sentences (Chinese).
+    Max 3 events.
     
-    要求：
-    1. **细粒度拆分**：不要把所有内容合并成一句话。请根据剧情发展，按时间顺序拆分为 2 到 6 个独立的事件点。
-    2. **动作导向**：每个事件应描述具体的动作、对话转折或心理变化（例如：“凯尔拔枪射击”、“反派倒地身亡”、“主角意识到被骗”）。
-    3. **简洁**：每个事件控制在 15-20 字以内。
-    
-    请直接返回 JSON 字符串数组，例如：["凯尔进入拉面摊", "老鼠带着重伤出现", "老鼠交付芯片后身亡"]。
-    
-    === 片段 ===
-    ${sectionContent}
+    Text:
+    ${text.slice(0, 10000)}
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: aiConfig?.modelName || 'gemini-3-flash-preview',
+        const response = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
-                responseMimeType: "application/json",
+                responseMimeType: 'application/json',
                 responseSchema: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING }
                 }
             }
-        });
-        
-        const result = JSON.parse(response.text || "[]");
-        return Array.isArray(result) ? result : [];
+        })) as GenerateContentResponse;
+        return JSON.parse(response.text || '[]');
     } catch (e) {
-        console.error("Event generation failed", e);
+        console.error("Summarize failed", e);
         return [];
     }
 };
 
-// --- Proofreading ---
-export const proofreadText = async (text: string, aiConfig?: AIConfig): Promise<string> => {
-    const ai = getClient(aiConfig?.apiKey);
+// --- Outline Chat Streaming ---
+export async function* streamOutlineChat(
+    input: string, 
+    history: ChatMessage[], 
+    contextTitle: string,
+    worldEntities: WorldEntity[],
+    rules: Rule[],
+    events: EventLog[],
+    globalOutline: string,
+    previousContent: string
+) {
+    const ai = getClient();
+    
+    // Explicitly defining Outline Context:
+    // Global Rules Only. No Active Chapter Outline. No Local Rules.
+    const contextStr = `
+    Title: ${contextTitle}
+    
+    [GLOBAL OUTLINE]
+    ${globalOutline}
+    
+    [WORLD SETTING DATABASE]
+    ${worldEntities.slice(0, 50).map(e => `${e.name} (${e.type})`).join(', ')}
+    
+    [STORY FLOW EVENT DATABASE]
+    ${events.slice(-5).map(e => e.content).join('; ')}
+    
+    [GLOBAL RULES]
+    ${rules.filter(r => r.isActive).map(r => r.content).join('; ')}
+    
+    [PREVIOUS TEXT CONTEXT]
+    ${previousContent.slice(0, 1000)}...
+    `;
+
+    const systemInstruction = `You are a professional novel writing assistant (Outline Consultant).
+    Help the user brainstorm and structure their outline.
+    If you suggest options, use the format :::choices ["Option 1", "Option 2"] ::: at the end.
+    
+    CONTEXT:
+    ${contextStr}
+    `;
+
+    // Convert history for SDK
+    const sdkHistory = history.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+    }));
+
+    const chat = ai.chats.create({
+        model: 'gemini-3-flash-preview',
+        config: { systemInstruction },
+        history: sdkHistory
+    });
+
+    const result = await retryWithBackoff(() => chat.sendMessageStream({ message: input }));
+    
+    for await (const chunk of (result as any)) {
+        const c = chunk as GenerateContentResponse;
+        yield c.text;
+    }
+}
+
+// --- Generate Outline from Chat ---
+export const generateOutlineFromChat = async (history: ChatMessage[], title: string): Promise<string> => {
+    const ai = getClient();
+    const chatText = history.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
     const prompt = `
-    你是一个严谨的文字校对员。请对以下小说段落进行【基础纠错】。
+    Based on the following discussion about "${title}", generate a structured Markdown outline.
     
-    严格遵守以下原则：
-    1. **仅**修正错别字 (Typos) 和明显的标点符号错误。
-    2. **严禁**润色、改写、扩写或“优化”原文的遣词造句。
-    3. **严禁**改变原文的语气、风格或意图。
-    4. 如果原文没有明显错误，请原样返回。
+    Discussion:
+    ${chatText}
+    `;
+
+    try {
+        const response = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt
+        })) as GenerateContentResponse;
+        return response.text || '';
+    } catch (e) {
+        console.error("Generate outline failed", e);
+        throw e;
+    }
+};
+
+// --- Generate Cover Image ---
+export const generateCoverImage = async (prompt: string, style: string): Promise<string> => {
+    const ai = getClient();
+    const fullPrompt = `Create a book cover image. Style: ${style}. Description: ${prompt}. No text.`;
     
-    输出要求：
-    - 直接输出校对后的完整正文。
-    - 不要包含 "好的"、"校对如下" 或 Markdown 代码块标记。
-    - 保持段落结构完全一致。
-    
-    === 原文 ===
+    try {
+        // Use gemini-2.5-flash-image for image generation
+        const response = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: fullPrompt }] },
+            config: {
+                imageConfig: { aspectRatio: '3:4' }
+            }
+        })) as GenerateContentResponse;
+
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData && part.inlineData.data) {
+                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+        }
+        throw new Error("No image generated in response");
+    } catch (e) {
+        console.error("Cover generation failed", e);
+        throw e;
+    }
+};
+
+// --- Proofreading ---
+export const proofreadText = async (text: string): Promise<string> => {
+    const ai = getClient();
+    const prompt = `
+    You are a professional editor. Proofread the following novel text.
+    Focus ONLY on fixing objective errors: typos, punctuation mistakes, and clear grammatical errors.
+    Do NOT change the writing style, tone, or choice of words unless they are erroneous.
+    Do NOT add comments or explanations.
+    Return only the corrected text.
+
+    Text:
     ${text}
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: aiConfig?.modelName || 'gemini-3-flash-preview',
+        const response = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
             contents: prompt
-        });
-        // Clean up potential markdown wrappers just in case
-        let result = response.text?.trim() || text;
-        if (result.startsWith('```')) {
-            result = result.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
-        }
-        return result;
+        })) as GenerateContentResponse;
+        
+        return response.text?.trim() || text;
     } catch (e) {
         console.error("Proofread failed", e);
         throw e;
     }
 };
 
-// --- Generate Cover Image ---
-export const generateCoverImage = async (
-    prompt: string,
-    style: string = "Cinematic, High Detail",
-    aiConfig?: AIConfig
-): Promise<string> => {
-    const ai = getClient(aiConfig?.apiKey);
-    const fullPrompt = `Book cover illustration, ${prompt}, style: ${style}, vertical aspect ratio, high resolution, masterpiece, no text.`;
+// --- Context Preview Helper (Synchronous) ---
+export const getContextPreview = (
+    worldEntities: WorldEntity[],
+    rules: Rule[],
+    events: EventLog[],
+    globalOutline: string,
+    chapterOutline: string,
+    localRules: string,
+    previousContent: string,
+    chapterTitle: string
+): string => {
+    return `
+=== SYSTEM CONTEXT PREVIEW ===
 
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image', // Specific image model
-            contents: {
-                parts: [{ text: fullPrompt }]
-            },
-            config: {
-                imageConfig: {
-                    aspectRatio: "3:4", // Closest to 2:3 book ratio
-                }
-            }
-        });
+[NOVEL METADATA]
+Chapter Title: ${chapterTitle}
 
-        // Iterate to find image part
-        for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                const base64String = part.inlineData.data;
-                return `data:image/png;base64,${base64String}`;
-            }
-        }
-        throw new Error("No image data received");
-    } catch (e) {
-        console.error("Image generation failed", e);
-        throw e;
-    }
+[GLOBAL OUTLINE]
+${globalOutline}
+
+[ACTIVE CHAPTER OUTLINE]
+${chapterOutline || "(Empty or N/A for Outline Mode)"}
+
+[ACTIVE RULES]
+${rules.filter(r => r.isActive).map(r => `- ${r.content}`).join('\n')}
+${localRules ? `\n[LOCAL RULES (BODY CONTEXT ONLY)]\n${localRules}` : ''}
+
+[WORLD SETTING DATABASE (${worldEntities.length})]
+${worldEntities.map(e => `${e.name} [${e.type}]: ${e.description.slice(0, 50)}...`).join('\n')}
+
+[STORY FLOW EVENT DATABASE]
+${events.slice(-10).map(e => `- ${e.content}`).join('\n')}
+
+[PREVIOUS TEXT CONTEXT]
+${previousContent ? previousContent.slice(-1000) + '\n...(truncated)' : '(None)'}
+    `.trim();
 };

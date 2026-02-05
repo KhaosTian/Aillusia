@@ -39,17 +39,10 @@ export const exportNovelAsText = (novel: Novel) => {
     let content = `# ${novel.title}\n\n`;
     if (novel.description) content += `简介：\n${novel.description}\n\n`;
     
-    novel.items.forEach(item => {
-        if (item.type === 'VOLUME') {
-            content += `\n\n## ${item.title}\n\n`;
-            item.chapters.forEach(chap => {
-                content += `### ${chap.title}\n\n`;
-                chap.sections.forEach(sec => content += `${sec.content}\n\n`);
-            });
-        } else {
-            content += `\n### ${item.title}\n\n`;
-            item.sections.forEach(sec => content += `${sec.content}\n\n`);
-        }
+    // Flat chapter iteration
+    novel.items.forEach(chap => {
+        content += `\n### ${chap.title}\n\n`;
+        chap.sections.forEach(sec => content += `${sec.content}\n\n`);
     });
     
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -58,8 +51,7 @@ export const exportNovelAsText = (novel: Novel) => {
 
 /**
  * Export as Directory Structure (.zip)
- * Contains folders for volumes and .txt files for chapters.
- * No metadata, purely for content structure.
+ * Contains .txt files for chapters.
  */
 export const exportNovelAsStructureZip = async (novel: Novel) => {
     const safeTitle = sanitizeFilename(novel.title);
@@ -73,22 +65,10 @@ export const exportNovelAsStructureZip = async (novel: Novel) => {
         rootFolder.file("00_简介.txt", novel.description);
     }
 
-    novel.items.forEach((item, index) => {
+    novel.items.forEach((chap, index) => {
         const prefix = (index + 1).toString().padStart(2, '0');
-        
-        if (item.type === 'VOLUME') {
-            const volFolder = rootFolder.folder(`${prefix}_${sanitizeFilename(item.title)}`);
-            if (volFolder) {
-                item.chapters.forEach((chap, cIdx) => {
-                    const cPrefix = (cIdx + 1).toString().padStart(2, '0');
-                    const chapContent = chap.sections.map(s => s.content).join('\n\n');
-                    volFolder.file(`${cPrefix}_${sanitizeFilename(chap.title)}.txt`, chapContent);
-                });
-            }
-        } else {
-            const chapContent = item.sections.map(s => s.content).join('\n\n');
-            rootFolder.file(`${prefix}_${sanitizeFilename(item.title)}.txt`, chapContent);
-        }
+        const chapContent = chap.sections.map(s => s.content).join('\n\n');
+        rootFolder.file(`${prefix}_${sanitizeFilename(chap.title)}.txt`, chapContent);
     });
 
     const content = await zip.generateAsync({ type: "blob" });

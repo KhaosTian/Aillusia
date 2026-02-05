@@ -5,9 +5,9 @@ export const t = {
     backToShelf: "返回书架",
     editor: "写作",
     outline: "大纲",
-    world: "世界观",
-    rules: "规则",
-    events: "事件",
+    world: "世界观", // Simplified
+    rules: "规则", // Simplified
+    events: "剧情流", // Simplified
     chapters: "章节目录",
     newChapter: "新建章节",
     settings: "设置",
@@ -32,14 +32,14 @@ export const t = {
     finishChapter: "智能完稿",
     addSection: "添加新的一节",
     aiCommand: "告诉 AI 写什么...",
-    worldDB: "世界观数据库",
+    worldDB: "世界观设定数据库", // Full Name can remain descriptive if used in headers
     worldDesc: "上下文系统将根据此处的角色、地点和物品设定辅助写作。",
     addEntity: "添加设定",
     clickToAdd: "点击添加新设定",
-    rulesTitle: "写作规则",
+    rulesTitle: "写作规则系统",
     rulesDesc: "AI 生成正文时必须严格遵守的约束条件。",
     addRule: "添加规则",
-    eventsTitle: "事件时间轴",
+    eventsTitle: "剧情流事件数据库", // Full Name
     eventsDesc: "此时间轴由章节小节内容自动生成，反映了正文的事件流。",
     noEvents: "本章暂无关键事件记录。",
     analysisTitle: "章节内容分析",
@@ -155,9 +155,6 @@ export const t = {
     section: "第 {n} 节",
     jumpTo: "跳转至此",
     // Context Menu & Status
-    statusDraft: "草稿",
-    statusReview: "修订",
-    statusDone: "完稿",
     markAs: "标记为",
     rename: "重命名",
     deleteItem: "删除 (立即)",
@@ -176,9 +173,9 @@ export const t = {
     backToShelf: "Back to Shelf",
     editor: "Editor",
     outline: "Outline",
-    world: "World",
-    rules: "Rules",
-    events: "Events",
+    world: "World", // Updated
+    rules: "Rules", // Updated
+    events: "Story Flow", // Updated
     chapters: "Chapters",
     newChapter: "New Chapter",
     settings: "Settings",
@@ -203,14 +200,14 @@ export const t = {
     finishChapter: "Smart Finalize",
     addSection: "Add New Section",
     aiCommand: "Tell AI what to write...",
-    worldDB: "World Database",
+    worldDB: "World Setting Database", // Full Name
     worldDesc: "Context system uses these entities to assist writing.",
     addEntity: "Add Entity",
     clickToAdd: "Click to add new entity",
-    rulesTitle: "Writing Rules",
+    rulesTitle: "Writing Rules System",
     rulesDesc: "Constraints the AI must follow when generating text.",
     addRule: "Add Rule",
-    eventsTitle: "Event Timeline",
+    eventsTitle: "Story Flow Event Database", // Full Name
     eventsDesc: "Generated automatically from section summaries.",
     noEvents: "No key events recorded in this chapter.",
     analysisTitle: "Chapter Analysis",
@@ -326,9 +323,6 @@ export const t = {
     section: "Section {n}",
     jumpTo: "Jump to",
     // Context Menu & Status
-    statusDraft: "Draft",
-    statusReview: "Review",
-    statusDone: "Done",
     markAs: "Mark as",
     rename: "Rename",
     deleteItem: "Delete (Instant)",

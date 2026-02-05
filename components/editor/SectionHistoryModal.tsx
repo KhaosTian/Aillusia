@@ -1,14 +1,14 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { diffChars } from 'diff';
 import { SectionSnapshot } from '../../types';
 import { 
     HistoryIcon, XCircleIcon, ClockIcon, 
     ClipboardIcon, RefreshIcon, EyeIcon, 
-    LayoutIcon, FilterIcon, ArrowRightIcon
+    LayoutIcon, FilterIcon 
 } from '../Icons';
 import { toast } from '../../services/toast';
+import { DiffViewer } from './DiffViewer';
 
 interface SectionHistoryModalProps {
     isOpen: boolean;
@@ -30,12 +30,6 @@ export const SectionHistoryModal: React.FC<SectionHistoryModalProps> = ({
     const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'PREVIEW' | 'DIFF'>('PREVIEW'); 
     const [filter, setFilter] = useState<'ALL' | 'MANUAL'>('ALL');
-
-    // Scroll Sync Refs
-    const leftPanelRef = useRef<HTMLDivElement>(null);
-    const rightPanelRef = useRef<HTMLDivElement>(null);
-    const isScrollingRef = useRef<string | null>(null);
-    const scrollTimeoutRef = useRef<any>(null);
 
     const sortedSnapshots = [...snapshots].sort((a, b) => b.timestamp - a.timestamp);
     
@@ -80,99 +74,10 @@ export const SectionHistoryModal: React.FC<SectionHistoryModalProps> = ({
         return <span className="text-slate-400">无变化</span>;
     };
 
-    // --- Scroll Sync Handler ---
-    const handleScroll = (source: 'left' | 'right') => {
-        const sourceRef = source === 'left' ? leftPanelRef : rightPanelRef;
-        const targetRef = source === 'left' ? rightPanelRef : leftPanelRef;
-
-        if (isScrollingRef.current && isScrollingRef.current !== source) return;
-
-        isScrollingRef.current = source;
-        if (sourceRef.current && targetRef.current) {
-            targetRef.current.scrollTop = sourceRef.current.scrollTop;
-        }
-
-        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = setTimeout(() => {
-            isScrollingRef.current = null;
-        }, 50);
-    };
-
-    // --- Side-by-Side Diff Rendering ---
-    const renderSideBySideDiff = (oldText: string, newText: string) => {
-        const diffs = diffChars(oldText, newText);
-
-        const leftContent = diffs.map((part, index) => {
-            if (part.added) return null;
-            if (part.removed) {
-                return (
-                    <span key={index} className="bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 decoration-clone rounded-sm">
-                        {part.value}
-                    </span>
-                );
-            }
-            return <span key={index} className="text-slate-600 dark:text-slate-400">{part.value}</span>;
-        });
-
-        const rightContent = diffs.map((part, index) => {
-            if (part.removed) return null;
-            if (part.added) {
-                return (
-                    <span key={index} className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 decoration-clone rounded-sm">
-                        {part.value}
-                    </span>
-                );
-            }
-            return <span key={index} className="text-slate-600 dark:text-slate-400">{part.value}</span>;
-        });
-
-        return (
-            <div className="flex h-full divide-x divide-slate-200 dark:divide-white/10">
-                {/* Left Panel: Snapshot */}
-                <div className="flex-1 flex flex-col min-w-0 bg-slate-50/30 dark:bg-[#0d1117]/30">
-                    <div className="px-4 py-2 bg-slate-100/50 dark:bg-white/5 border-b border-slate-100 dark:border-white/5 text-xs font-bold text-slate-500 flex justify-between items-center sticky top-0 backdrop-blur-sm z-10">
-                        <span>历史版本 (Snapshot)</span>
-                        <span className="font-mono text-[10px] bg-white dark:bg-black/20 px-2 py-0.5 rounded text-rose-500">
-                            -{diffs.filter(d => d.removed).reduce((acc, d) => acc + d.value.length, 0)} chars
-                        </span>
-                    </div>
-                    <div 
-                        ref={leftPanelRef}
-                        onScroll={() => handleScroll('left')}
-                        className="flex-1 overflow-y-auto custom-scrollbar p-6 whitespace-pre-wrap font-serif text-sm leading-relaxed"
-                    >
-                        {leftContent}
-                    </div>
-                </div>
-
-                {/* Right Panel: Current */}
-                <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#161b22]">
-                    <div className="px-4 py-2 bg-slate-50/80 dark:bg-white/5 border-b border-slate-100 dark:border-white/5 text-xs font-bold text-indigo-600 dark:text-indigo-400 flex justify-between items-center sticky top-0 backdrop-blur-sm z-10">
-                        <span>当前版本 (Current)</span>
-                        <span className="font-mono text-[10px] bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded text-emerald-500">
-                            +{diffs.filter(d => d.added).reduce((acc, d) => acc + d.value.length, 0)} chars
-                        </span>
-                    </div>
-                    <div 
-                        ref={rightPanelRef}
-                        onScroll={() => handleScroll('right')}
-                        className="flex-1 overflow-y-auto custom-scrollbar p-6 whitespace-pre-wrap font-serif text-sm leading-relaxed"
-                    >
-                        {rightContent}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     const modalRoot = document.getElementById('workspace-modal-root') || document.body;
 
     return createPortal(
         <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-8 animate-fade-in select-none pointer-events-auto">
-            {/* 
-                Overlay: No blur (backdrop-blur-md removed), lighter opacity.
-                This creates a cleaner "overlay" feel rather than a "modal" feel.
-            */}
             <div 
                 className="absolute inset-0 bg-slate-900/10 dark:bg-black/40 transition-opacity" 
                 onClick={onClose}
@@ -195,7 +100,6 @@ export const SectionHistoryModal: React.FC<SectionHistoryModalProps> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        {/* View Toggle */}
                         <div className="flex bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-lg p-1">
                             <button
                                 onClick={() => setViewMode('PREVIEW')}
@@ -292,8 +196,11 @@ export const SectionHistoryModal: React.FC<SectionHistoryModalProps> = ({
                                     </div>
                                 </div>
                             ) : (
-                                // Diff Mode
-                                renderSideBySideDiff(selectedSnapshot.content, currentContent)
+                                <DiffViewer 
+                                    originalContent={selectedSnapshot.content}
+                                    modifiedContent={currentContent}
+                                    labels={{ original: '历史版本 (Snapshot)', modified: '当前版本 (Current)' }}
+                                />
                             )
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-slate-400">

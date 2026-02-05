@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { LayoutIcon, EyeIcon, PenIcon } from '../Icons';
+import { EyeIcon, PenIcon } from '../Icons';
 
 interface OutlineEditorProps {
     content: string;
@@ -20,55 +20,51 @@ export const OutlineEditor: React.FC<OutlineEditorProps> = ({
     const [isPreviewMode, setIsPreviewMode] = useState(false);
 
     return (
-        <div className={`bg-white dark:bg-[#161b22] rounded-3xl shadow-sm border ${scope === 'GLOBAL' ? 'border-indigo-200 dark:border-indigo-900' : 'border-slate-100 dark:border-white/5'} flex flex-col overflow-hidden relative hover:shadow-md transition-all duration-300`}>
-                <div className="h-16 px-6 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-white dark:bg-[#161b22] shrink-0 select-none">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                    <LayoutIcon className={`w-4 h-4 ${scope === 'GLOBAL' ? 'text-indigo-500' : 'text-sky-500'}`} />
-                    {scope === 'GLOBAL' ? currentT.globalOutline : currentT.structureOutline}
-                </span>
-                
-                <button 
-                    onClick={() => setIsPreviewMode(!isPreviewMode)}
-                    className={`
-                        flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-wider transition-all
-                        ${isPreviewMode 
-                            ? 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300' 
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-[#0d1117] dark:text-[#8b949e]'}
-                    `}
-                >
-                    {isPreviewMode ? (
-                        <>
-                            <EyeIcon className="w-3 h-3" />
-                            {currentT.previewMode}
-                        </>
-                    ) : (
-                        <>
-                            <PenIcon className="w-3 h-3" />
-                            {currentT.editMode}
-                        </>
-                    )}
-                </button>
+        <div className={`bg-white dark:bg-[#161b22] rounded-[32px] shadow-xl shadow-slate-200/50 dark:shadow-none border border-white dark:border-white/5 flex flex-col overflow-hidden relative transition-all duration-300 h-full`}>
+                {/* Minimal Header */}
+                <div className="h-16 px-6 border-b border-slate-50 dark:border-white/5 flex items-center justify-end bg-white dark:bg-[#161b22] shrink-0 select-none backdrop-blur-md">
+                    <button 
+                        onClick={() => setIsPreviewMode(!isPreviewMode)}
+                        className={`
+                            flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition-all
+                            ${isPreviewMode 
+                                ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/50 dark:text-indigo-300' 
+                                : 'bg-slate-50 text-slate-500 hover:bg-slate-100 dark:bg-white/5 dark:text-[#8b949e] dark:hover:bg-white/10'}
+                        `}
+                    >
+                        {isPreviewMode ? (
+                            <>
+                                <EyeIcon className="w-3.5 h-3.5" />
+                                {currentT.previewMode}
+                            </>
+                        ) : (
+                            <>
+                                <PenIcon className="w-3.5 h-3.5" />
+                                {currentT.editMode}
+                            </>
+                        )}
+                    </button>
                 </div>
 
-                <div className="flex-1 relative overflow-hidden">
-                {isPreviewMode ? (
-                        <div className="w-full h-full p-8 overflow-y-auto custom-scrollbar bg-slate-50/30 dark:bg-[#0d1117]/30">
-                        <div className="markdown-body text-sm text-slate-700 dark:text-[#c9d1d9] leading-7">
-                            <ReactMarkdown 
-                                remarkPlugins={[remarkGfm]} 
-                            >
-                                {content || "*暂无大纲内容*"}
-                            </ReactMarkdown>
-                        </div>
-                        </div>
-                ) : (
-                    <textarea 
-                        value={content}
-                        onChange={(e) => onChange(e.target.value)}
-                        className="w-full h-full p-8 bg-transparent outline-none resize-none font-mono text-sm leading-relaxed text-slate-700 dark:text-[#c9d1d9] placeholder-slate-200 dark:placeholder-[#8b949e] custom-scrollbar"
-                        placeholder="Markdown..."
-                    />
-                )}
+                <div className="flex-1 relative overflow-hidden h-full">
+                    {isPreviewMode ? (
+                            <div className="w-full h-full p-10 overflow-y-auto custom-scrollbar bg-white dark:bg-[#0d1117]">
+                                <div className="markdown-body text-sm text-slate-700 dark:text-[#c9d1d9] leading-8 font-serif">
+                                    <ReactMarkdown 
+                                        remarkPlugins={[remarkGfm]} 
+                                    >
+                                        {content || "*暂无大纲内容*"}
+                                    </ReactMarkdown>
+                                </div>
+                            </div>
+                    ) : (
+                        <textarea 
+                            value={content}
+                            onChange={(e) => onChange(e.target.value)}
+                            className="w-full h-full p-10 bg-transparent outline-none resize-none font-mono text-sm leading-relaxed text-slate-700 dark:text-[#c9d1d9] placeholder-slate-300 dark:placeholder-[#8b949e] custom-scrollbar selection:bg-indigo-100 selection:text-indigo-900"
+                            placeholder={scope === 'GLOBAL' ? "编写全书大纲..." : "编写本章大纲..."}
+                        />
+                    )}
                 </div>
         </div>
     );

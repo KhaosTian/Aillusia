@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { WorldEntity, Section } from '../types';
-import { diffChars } from 'diff';
+import { WorldEntity } from '../types';
 import { 
-    SparklesIcon, GlobeIcon, PlusIcon, 
-    LayoutIcon, SearchIcon, DatabaseIcon, CheckCircleIcon, CalendarIcon,
-    ArrowRightIcon, WandIcon, TypeIcon, ScaleIcon
+    SparklesIcon, GlobeIcon,  
+    CheckCircleIcon, CalendarIcon,
+    ArrowRightIcon
 } from './Icons';
 
 // --- Shared Types & Helpers ---
@@ -13,7 +12,6 @@ import {
 interface AnalysisResult {
   newEntities: { name: string; type: 'CHARACTER' | 'SETTING' | 'ITEM' | 'LORE'; description: string }[];
   sectionEvents: { sectionId: string; events: string[] }[];
-  proofreadSections: { sectionId: string; original: string; corrected: string }[];
 }
 
 interface ChapterAnalysisModalProps {
@@ -24,7 +22,6 @@ interface ChapterAnalysisModalProps {
   // Callbacks for each step
   onAddEntities: (entities: WorldEntity[]) => void;
   onUpdateEvents: (updates: { sectionId: string; events: string[] }[]) => void;
-  onApplyProofread: (updates: { sectionId: string; content: string }[]) => void;
   
   existingEntities: WorldEntity[]; // Current DB
   currentT: any; // Locale
@@ -33,7 +30,6 @@ interface ChapterAnalysisModalProps {
 const STEPS = [
     { id: 'ENTITIES', label: '设定发现', icon: GlobeIcon, desc: 'AI 自动识别新登场的角色与物品' },
     { id: 'EVENTS', label: '剧情梳理', icon: CalendarIcon, desc: '生成事件摘要，并高亮匹配设定' },
-    { id: 'PROOFREAD', label: '智能纠错', icon: WandIcon, desc: '检查错别字与标点符号' },
 ];
 
 const ENTITY_COLORS: Record<string, string> = {
@@ -80,7 +76,6 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
   onClose, 
   onAddEntities,
   onUpdateEvents,
-  onApplyProofread,
   existingEntities,
   currentT
 }) => {
@@ -90,10 +85,6 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
   const [selectedEntityIndices, setSelectedEntityIndices] = useState<number[]>([]);
   const [filteredResultEntities, setFilteredResultEntities] = useState<AnalysisResult['newEntities']>([]);
   
-  // Step 2 State: Events (No special state, just display)
-  // Step 3 State: Proofread
-  const [selectedProofreadSections, setSelectedProofreadSections] = useState<string[]>([]); // sectionIds
-
   // --- Initialization ---
   useEffect(() => {
     if (isOpen && result) {
@@ -106,12 +97,6 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
         });
         setFilteredResultEntities(uniqueEntities);
         setSelectedEntityIndices(uniqueEntities.map((_, i) => i)); // Select all by default
-
-        // Init Proofread
-        const sectionsWithChanges = result.proofreadSections
-            .filter(s => s.original !== s.corrected)
-            .map(s => s.sectionId);
-        setSelectedProofreadSections(sectionsWithChanges);
         
         setCurrentStepIndex(0);
     }
@@ -125,7 +110,6 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
               "正在深度阅读章节内容...",
               "正在提取潜在的世界观设定...",
               "正在梳理剧情事件脉络...",
-              "正在进行逐字逐句的纠错...",
               "即将生成最终报告..."
           ];
           let i = 0;
@@ -154,35 +138,21 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
           if (finalEntities.length > 0) {
               onAddEntities(finalEntities);
           }
-      } else if (currentStepIndex === 1) {
-          // Finish Step 2: Update Events
-          // Events are already in `result.sectionEvents`, we just commit them
-          const updates = result.sectionEvents.map(s => ({ sectionId: s.sectionId, events: s.events }));
-          onUpdateEvents(updates);
       }
 
       // Advance
       if (currentStepIndex < STEPS.length - 1) {
           setCurrentStepIndex(prev => prev + 1);
       } else {
-          // Finish Step 3: Apply Proofread
-          const updates = result.proofreadSections
-              .filter(s => selectedProofreadSections.includes(s.sectionId))
-              .map(s => ({ sectionId: s.sectionId, content: s.corrected }));
-          
-          if (updates.length > 0) {
-              onApplyProofread(updates);
-          }
+          // Finish Step 2: Update Events (Final Step)
+          const updates = result.sectionEvents.map(s => ({ sectionId: s.sectionId, events: s.events }));
+          onUpdateEvents(updates);
           onClose();
       }
   };
 
   const handleToggleEntity = (index: number) => {
       setSelectedEntityIndices(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
-  };
-
-  const handleToggleProofread = (sectionId: string) => {
-      setSelectedProofreadSections(prev => prev.includes(sectionId) ? prev.filter(id => id !== sectionId) : [...prev, sectionId]);
   };
 
   // --- Renderers ---
@@ -264,63 +234,6 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
       );
   };
 
-  const renderProofreadStep = () => {
-      return (
-          <div className="space-y-4 animate-fade-in">
-              <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-slate-500 dark:text-slate-400">
-                      发现 <strong className="text-rose-500">{result?.proofreadSections.filter(s => s.original !== s.corrected).length}</strong> 处建议修改。请勾选应用。
-                  </div>
-              </div>
-
-              <div className="space-y-4 max-h-[55vh] overflow-y-auto custom-scrollbar pr-2">
-                  {result?.proofreadSections.map((sec, idx) => {
-                      const hasChanges = sec.original !== sec.corrected;
-                      const isSelected = selectedProofreadSections.includes(sec.sectionId);
-                      
-                      if (!hasChanges) return null;
-
-                      const diffs = diffChars(sec.original, sec.corrected);
-
-                      return (
-                          <div 
-                              key={sec.sectionId} 
-                              onClick={() => handleToggleProofread(sec.sectionId)}
-                              className={`
-                                  rounded-xl border-2 transition-all overflow-hidden cursor-pointer
-                                  ${isSelected 
-                                      ? 'border-indigo-500 shadow-md' 
-                                      : 'border-slate-100 dark:border-white/5 opacity-80 hover:opacity-100'}
-                              `}
-                          >
-                              <div className={`px-4 py-2 flex items-center justify-between ${isSelected ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-slate-50 dark:bg-slate-800'}`}>
-                                  <span className="text-xs font-bold text-slate-500 uppercase">第 {idx + 1} 节</span>
-                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 dark:border-slate-600'}`}>
-                                      {isSelected && <CheckCircleIcon className="w-3.5 h-3.5" />}
-                                  </div>
-                              </div>
-                              <div className="p-4 bg-white dark:bg-[#161b22] text-sm leading-relaxed font-serif whitespace-pre-wrap">
-                                  {diffs.map((part, i) => {
-                                      if (part.added) return <span key={i} className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 rounded px-0.5">{part.value}</span>;
-                                      if (part.removed) return <span key={i} className="bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 line-through opacity-60 px-0.5">{part.value}</span>;
-                                      return <span key={i} className="text-slate-600 dark:text-slate-400">{part.value}</span>;
-                                  })}
-                              </div>
-                          </div>
-                      );
-                  })}
-                  {result?.proofreadSections.every(s => s.original === s.corrected) && (
-                      <div className="py-12 text-center border-2 border-dashed border-emerald-100 dark:border-emerald-900/30 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/10">
-                          <CheckCircleIcon className="w-12 h-12 mx-auto text-emerald-400 mb-2" />
-                          <p className="text-emerald-600 dark:text-emerald-400 font-bold">完美！</p>
-                          <p className="text-slate-400 text-sm mt-1">AI 未发现明显的错别字或语病。</p>
-                      </div>
-                  )}
-              </div>
-          </div>
-      );
-  };
-
   return (
     <div className="absolute inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in select-none pointer-events-auto">
         <div className="bg-white dark:bg-[#0d1117] rounded-2xl shadow-2xl w-full max-w-3xl h-[85vh] flex flex-col overflow-hidden border border-slate-200 dark:border-white/10 ring-1 ring-white/10">
@@ -346,7 +259,7 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
                     <div className="px-8 pt-8 pb-4 bg-slate-50 dark:bg-[#161b22] border-b border-slate-100 dark:border-white/5">
                         <div className="flex justify-between items-center relative">
                             {/* Connector Line */}
-                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-700 -z-0 transform -translate-y-1/2 mx-10"></div>
+                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-700 -z-0 transform -translate-y-1/2 mx-20"></div>
                             
                             {STEPS.map((step, idx) => {
                                 const isActive = idx === currentStepIndex;
@@ -376,7 +289,6 @@ export const ChapterAnalysisModal: React.FC<ChapterAnalysisModalProps> = ({
                     <div className="flex-1 p-8 overflow-hidden bg-white dark:bg-[#0d1117]">
                         {currentStepIndex === 0 && renderEntitiesStep()}
                         {currentStepIndex === 1 && renderEventsStep()}
-                        {currentStepIndex === 2 && renderProofreadStep()}
                     </div>
 
                     {/* Footer */}

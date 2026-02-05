@@ -9,42 +9,110 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Theme: Indigo (Default) - Concentrated Color Management */
+        /* RGB values are used to allow Tailwind's opacity modifiers to work */
+        --color-primary-50: 238 242 255;
+        --color-primary-100: 224 231 255;
+        --color-primary-200: 199 210 254;
+        --color-primary-300: 165 180 252;
+        --color-primary-400: 129 140 248;
+        --color-primary-500: 99 102 241;  /* Main Brand Color */
+        --color-primary-600: 79 70 229;
+        --color-primary-700: 67 56 202;
+        --color-primary-800: 55 48 163;
+        --color-primary-900: 49 46 129;
+        --color-primary-950: 30 27 75;
+      }
+
+      /* Dark Mode Overrides (Optional, if you want different primary shades in dark mode) */
+      .dark {
+         /* Keep same for now, or adjust for better contrast */
+      }
+
+      /* Custom Scrollbar - Modern Aesthetic (Auto-hiding) */
+      ::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 10px;
+        transition: background-color 0.3s ease;
+      }
+      /* Only show scrollbar thumb on hover over the scrollable element */
+      *:hover::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.15);
+      }
+      .dark *:hover::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.15);
+      }
+      /* Active state */
+      ::-webkit-scrollbar-thumb:active {
+        background: rgba(0,0,0,0.3);
+      }
+      .dark ::-webkit-scrollbar-thumb:active {
+        background: rgba(255,255,255,0.3);
+      }
+      
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+      .dark .glass {
+        background: rgba(24, 24, 27, 0.7);
+      }
+
+      /* Markdown Styles */
+      .markdown-body { color: inherit; }
+      .markdown-body h1 { font-size: 1.5em; font-weight: 700; margin-top: 1.2em; margin-bottom: 0.6em; letter-spacing: -0.02em; }
+      .markdown-body h2 { font-size: 1.25em; font-weight: 600; margin-top: 1.2em; margin-bottom: 0.6em; letter-spacing: -0.01em; }
+      .markdown-body p { margin-bottom: 1.2em; line-height: 1.75; }
+      .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1.2em; }
+      .markdown-body blockquote { border-left: 3px solid #e2e8f0; padding-left: 1em; color: #64748b; margin-bottom: 1.2em; font-style: italic; }
+      .dark .markdown-body blockquote { border-left-color: #3f3f46; color: #a1a1aa; }
+    </style>
     <script>
       tailwind.config = {
         darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
-              sans: ['"Noto Sans SC"', '"Plus Jakarta Sans"', 'sans-serif'],
+              sans: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
               serif: ['"Noto Serif SC"', '"Merriweather"', 'serif'],
               mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", "monospace"],
-              ui: ['"Inter"', '"Noto Sans SC"', 'sans-serif'],
+              ui: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
             },
             colors: {
-              // Obsidian / Zinc Dark Theme
               slate: {
-                850: '#18181b', // Zinc 900 (Cards)
-                900: '#09090b', // Zinc 950 (Background)
-                950: '#000000', // Pure Black (Deep Backgrounds)
+                850: '#18181b', 
+                900: '#09090b', 
+                950: '#020617', 
               },
-              // Overrides for standard tailwind slate in dark mode to map to Zinc
-              // We keep the name 'slate' in usage but map values to Zinc for neutrality
-              
-              // Custom semantic colors
-              darkBorder: '#27272a', // Zinc 800
-              darkText: '#e4e4e7',   // Zinc 200
-              darkTextMuted: '#a1a1aa', // Zinc 400
-              
+              // Map 'primary' to CSS variables
               primary: {
-                50: '#f5f3ff',
-                100: '#ede9fe',
-                500: '#8b5cf6', // Violet 500
-                600: '#7c3aed', // Violet 600
-              },
+                50: 'rgb(var(--color-primary-50) / <alpha-value>)',
+                100: 'rgb(var(--color-primary-100) / <alpha-value>)',
+                200: 'rgb(var(--color-primary-200) / <alpha-value>)',
+                300: 'rgb(var(--color-primary-300) / <alpha-value>)',
+                400: 'rgb(var(--color-primary-400) / <alpha-value>)',
+                500: 'rgb(var(--color-primary-500) / <alpha-value>)',
+                600: 'rgb(var(--color-primary-600) / <alpha-value>)',
+                700: 'rgb(var(--color-primary-700) / <alpha-value>)',
+                800: 'rgb(var(--color-primary-800) / <alpha-value>)',
+                900: 'rgb(var(--color-primary-900) / <alpha-value>)',
+                950: 'rgb(var(--color-primary-950) / <alpha-value>)',
+              }
             },
             animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
-              'slide-up': 'slideUp 0.4s ease-out',
+              'fade-in': 'fadeIn 0.4s ease-out',
+              'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+              'slide-in-right': 'slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
               'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             },
             keyframes: {
@@ -55,55 +123,16 @@
               slideUp: {
                 '0%': { transform: 'translateY(20px)', opacity: '0' },
                 '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              slideInRight: {
+                '0%': { transform: 'translateX(100%)', opacity: '0' },
+                '100%': { transform: 'translateX(0)', opacity: '1' },
               }
             }
           }
         }
       }
     </script>
-    <style>
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #27272a;
-      }
-      .dark ::-webkit-scrollbar-thumb:hover {
-        background: #52525b;
-      }
-      
-      .glass {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-      }
-      .dark .glass {
-        background: rgba(24, 24, 27, 0.7);
-      }
-
-      /* Markdown Styles */
-      .markdown-body { color: inherit; }
-      .markdown-body h1 { font-size: 1.5em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
-      .markdown-body h2 { font-size: 1.25em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
-      .markdown-body h3 { font-size: 1.1em; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
-      .markdown-body p { margin-bottom: 1em; line-height: 1.7; }
-      .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
-      .markdown-body ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
-      .markdown-body blockquote { border-left: 4px solid #e2e8f0; padding-left: 1em; color: #64748b; margin-bottom: 1em; font-style: italic; }
-      .dark .markdown-body blockquote { border-left-color: #3f3f46; color: #a1a1aa; }
-    </style>
   <script type="importmap">
 {
   "imports": {
@@ -111,8 +140,8 @@
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "@google/genai": "https://esm.sh/@google/genai@^1.39.0",
-    "react-markdown": "https://esm.sh/react-markdown@9.0.1",
-    "remark-gfm": "https://esm.sh/remark-gfm@4.0.0",
+    "react-markdown": "https://esm.sh/react-markdown@9.0.1?bundle",
+    "remark-gfm": "https://esm.sh/remark-gfm@4.0.0?bundle",
     "jszip": "https://esm.sh/jszip@3.10.1",
     "file-saver": "https://esm.sh/file-saver@2.0.5",
     "react-dom": "https://esm.sh/react-dom@^19.2.4",
@@ -121,7 +150,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-800 antialiased overflow-hidden dark:bg-slate-900 dark:text-zinc-200 transition-colors duration-300 selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-900/50 dark:selection:text-indigo-200">
+  <body class="bg-[#fafafa] text-slate-800 antialiased overflow-hidden dark:bg-[#050505] dark:text-zinc-200 transition-colors duration-300 selection:bg-primary-500/20 selection:text-primary-900 dark:selection:bg-primary-500/30 dark:selection:text-primary-100 font-ui">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

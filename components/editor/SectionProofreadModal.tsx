@@ -5,7 +5,7 @@ import { diffChars } from 'diff';
 import { 
     WandIcon, XCircleIcon, CheckCircleIcon, 
     RefreshIcon, ArrowRightIcon, SparklesIcon,
-    TypeIcon, ScaleIcon
+    TypeIcon, ScaleIcon, LayoutIcon
 } from '../Icons';
 import { proofreadText } from '../../services/geminiService';
 import { toast } from '../../services/toast';
@@ -25,9 +25,6 @@ const ANALYSIS_STEPS = [
     { label: '核对修改准确性...', icon: ScaleIcon },
     { label: '生成修正建议...', icon: CheckCircleIcon },
 ];
-
-// Helper icon component since LayoutIcon wasn't imported in the top list but used in steps
-import { LayoutIcon } from '../Icons';
 
 export const SectionProofreadModal: React.FC<SectionProofreadModalProps> = ({
     isOpen,

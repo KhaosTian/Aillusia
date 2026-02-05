@@ -2,7 +2,10 @@
 import React from 'react';
 import { ViewMode, Theme, Language } from '../../types';
 import { t } from '../../locales';
-import { BookOpenIcon, LayoutIcon, PenIcon, GlobeIcon, ScaleIcon, CalendarIcon, SunIcon, MoonIcon, SettingsIcon } from '../Icons';
+import { 
+    BookOpenIcon, LayoutIcon, PenIcon, GlobeIcon, ScaleIcon, CalendarIcon, 
+    SunIcon, MoonIcon, SettingsIcon, PanelLeftOpenIcon, PanelLeftCloseIcon, MaximizeIcon, TrashIcon 
+} from '../Icons';
 
 interface SidebarNavProps {
   activeView: ViewMode;
@@ -13,35 +16,32 @@ interface SidebarNavProps {
   onToggleTheme: () => void;
   language: Language;
   onToggleLanguage: () => void;
+  // Layout Controls
+  layoutMode: 'STANDARD' | 'IMMERSIVE' | 'PURE';
+  onChangeLayoutMode: (mode: 'STANDARD' | 'IMMERSIVE' | 'PURE') => void;
 }
 
-const NavItem = ({ view, activeView, onSelect, icon: Icon, label }: { view: ViewMode; activeView: ViewMode; onSelect: (v: ViewMode) => void; icon: any; label: string }) => {
+const NavItem = ({ view, activeView, onSelect, icon: Icon, label, danger }: { view: ViewMode; activeView: ViewMode; onSelect: (v: ViewMode) => void; icon: any; label: string; danger?: boolean }) => {
     const isActive = activeView === view;
+    const baseColor = danger 
+        ? (isActive ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 hover:text-rose-500 dark:hover:text-rose-400')
+        : (isActive ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300');
+    
+    const bgClass = isActive 
+        ? (danger ? 'bg-rose-50 dark:bg-rose-900/20' : 'bg-slate-100 dark:bg-white/10')
+        : (danger ? 'hover:bg-rose-50 dark:hover:bg-rose-900/10' : 'hover:bg-slate-50 dark:hover:bg-white/5');
+
     return (
         <button
           onClick={() => onSelect(view)}
           className={`
-            w-full py-3 flex flex-col items-center justify-center gap-1.5 transition-all duration-200 group relative
-            ${isActive 
-              ? 'text-indigo-600 dark:text-indigo-400' 
-              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50/50 dark:hover:bg-white/5'}
+            relative flex items-center gap-2 px-5 py-2 rounded-full transition-all duration-200 group
+            ${baseColor} ${bgClass}
           `}
-          aria-label={label}
         >
-          <div className={`
-            p-2 rounded-xl transition-all duration-300
-            ${isActive ? 'bg-indigo-50 dark:bg-indigo-500/20' : 'bg-transparent'}
-          `}>
-             <Icon className={`w-5 h-5 transition-transform duration-300 ${isActive ? 'scale-110' : 'scale-100 group-hover:scale-105'}`} />
-          </div>
-          <span className={`text-[10px] font-medium tracking-wide ${isActive ? 'font-bold' : ''}`}>
-            {label}
-          </span>
-          
-          {/* Active Indicator Line on the left (Optional, distinct from the removed editor strip) */}
-          {isActive && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-indigo-600 dark:bg-indigo-400 rounded-r-full"></div>
-          )}
+           <Icon className={`w-4 h-4 transition-transform ${isActive ? 'scale-110' : ''}`} />
+           <span className="text-xs tracking-wide">{label}</span>
+           {isActive && <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full ${danger ? 'bg-rose-500' : 'bg-primary-600 dark:bg-primary-400'}`}></div>}
         </button>
     );
 };
@@ -55,54 +55,84 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     onToggleTheme,
     language,
     onToggleLanguage,
+    layoutMode,
+    onChangeLayoutMode
 }) => {
     const currentT = t[language];
 
     return (
-        <div className="w-20 flex flex-col items-center py-4 h-full bg-white dark:bg-[#09090b] border-r border-slate-100 dark:border-white/5 select-none">
+        <div className="w-full h-16 flex items-center justify-between px-6 bg-white dark:bg-[#161b22] select-none relative shrink-0">
             
-            {/* Logo / Home */}
-            <div className="mb-4 cursor-pointer group flex flex-col items-center gap-1" onClick={onBackToBookshelf} title={currentT.backToShelf}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:scale-105 transition-all duration-300 shadow-sm">
-                    <BookOpenIcon className="w-6 h-6" />
+            {/* Left: Brand / Back */}
+            <div className="flex items-center w-64">
+                <div className="cursor-pointer group flex items-center gap-3 hover:opacity-80 transition-opacity" onClick={onBackToBookshelf} title={currentT.backToShelf}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md">
+                        <BookOpenIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <span className="block text-sm font-black text-slate-800 dark:text-white tracking-tight leading-none">Aillusia</span>
+                    </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-500 transition-colors">Aillusia</span>
             </div>
 
-            <div className="w-8 h-px bg-slate-100 dark:bg-white/5 mb-2"></div>
-
-            {/* Main Nav */}
-            <div className="flex-1 flex flex-col w-full gap-1 overflow-y-auto scrollbar-hide">
-                {/* Writing Group */}
+            {/* Center: Main Navigation Tabs */}
+            <div className="flex items-center justify-center gap-1 bg-white dark:bg-[#161b22]">
                 <NavItem view="EDITOR" activeView={activeView} onSelect={onSelectView} icon={PenIcon} label={currentT.editor} />
                 <NavItem view="OUTLINE" activeView={activeView} onSelect={onSelectView} icon={LayoutIcon} label={currentT.outline} />
-                
-                <div className="my-2 px-4">
-                    <div className="h-px w-full bg-slate-100 dark:bg-white/5"></div>
-                </div>
-                
-                {/* Context Group */}
+                <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-2"></div>
                 <NavItem view="WORLD" activeView={activeView} onSelect={onSelectView} icon={GlobeIcon} label={currentT.world} />
                 <NavItem view="RULES" activeView={activeView} onSelect={onSelectView} icon={ScaleIcon} label={currentT.rules} />
                 <NavItem view="EVENTS" activeView={activeView} onSelect={onSelectView} icon={CalendarIcon} label={currentT.events} />
+                
+                {/* Trash Entry */}
+                <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-2"></div>
+                <NavItem view="TRASH" activeView={activeView} onSelect={onSelectView} icon={TrashIcon} label={currentT.recycleBin} danger />
             </div>
 
-            {/* Bottom Controls */}
-            <div className="mt-auto flex flex-col items-center gap-2 pt-4 border-t border-slate-50 dark:border-white/5 w-full">
-                <button 
-                    onClick={onToggleTheme}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
-                    title={theme === 'dark' ? currentT.settings : currentT.darkMode}
-                >
-                    {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-                </button>
-                <button 
-                    onClick={onOpenSettings}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
-                    title={currentT.settings}
-                >
-                    <SettingsIcon className="w-5 h-5" />
-                </button>
+            {/* Right: Layout Switcher & Settings */}
+            <div className="flex items-center justify-end gap-4 w-64">
+                
+                {/* Layout Switcher (Persistent) */}
+                <div className="flex items-center bg-slate-100 dark:bg-white/5 p-1 rounded-lg border border-slate-200 dark:border-white/5">
+                    <button 
+                        onClick={() => onChangeLayoutMode('STANDARD')}
+                        className={`p-1.5 rounded-md transition-all ${layoutMode === 'STANDARD' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="标准模式 (双侧栏)"
+                    >
+                        <PanelLeftOpenIcon className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={() => onChangeLayoutMode('IMMERSIVE')}
+                        className={`p-1.5 rounded-md transition-all ${layoutMode === 'IMMERSIVE' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="沉浸模式 (无侧栏)"
+                    >
+                        <PanelLeftCloseIcon className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={() => onChangeLayoutMode('PURE')}
+                        className={`p-1.5 rounded-md transition-all ${layoutMode === 'PURE' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400' : 'text-slate-400 hover:text-slate-600'}`}
+                        title="纯净模式 (全屏)"
+                    >
+                        <MaximizeIcon className="w-4 h-4" />
+                    </button>
+                </div>
+
+                <div className="w-px h-6 bg-slate-200 dark:bg-white/10"></div>
+
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={onToggleTheme}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all"
+                    >
+                        {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
+                    </button>
+                    <button 
+                        onClick={onOpenSettings}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition-all"
+                    >
+                        <SettingsIcon className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
         </div>
     );

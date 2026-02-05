@@ -1,59 +1,48 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { SidebarNav } from './components/sidebar/SidebarNav';
-import { Editor } from './components/Editor';
+import { SidebarNav } from './components/sidebar/SidebarNav'; 
 import { Bookshelf } from './components/Bookshelf';
-import { OutlineView } from './components/views/OutlineView';
-import { WorldView } from './components/views/WorldView';
-import { RulesView } from './components/views/RulesView';
-import { EventsView } from './components/views/EventsView';
-import { ChapterTrashView } from './components/views/ChapterTrashView';
+import { Workspace } from './components/Workspace';
+import { ContextSidebar } from './components/ContextSidebar';
 import { SettingsModal } from './components/SettingsModal';
-import { LogConsole } from './components/LogConsole';
 import { Layout } from './components/Layout';
 import { ToastContainer } from './components/Toast'; 
-import { Theme, WebDAVConfig, AIConfig, VoiceConfig, ViewMode, EditorFont } from './types';
-import { logger } from './services/logger';
+import { Theme, ViewMode, EditorFont } from './types';
 import { useNovelManager } from './hooks/useNovelManager';
-import { t } from './locales';
-import { toast } from './services/toast';
+import { PanelLeftOpenIcon } from './components/Icons';
 
 const App: React.FC = () => {
-  // Settings State
   const [theme, setTheme] = useState<Theme>('light');
   const [language, setLanguage] = useState<'zh' | 'en'>('zh');
-  const [fontFamily, setFontFamily] = useState<EditorFont>('serif');
-  const [fontSize, setFontSize] = useState<number>(18);
-  const [isDebugMode, setIsDebugMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'webdav' | 'ai' | 'data' | 'about'>('general');
-  
-  // Layout State
-  // STANDARD: SidebarNav + Sidebar + Editor
-  // IMMERSIVE: Editor Only (SidebarNav hidden, Sidebar hidden). Toolbar Visible. (Formerly Focus)
-  // PURE: Editor Only (Everything hidden). Toolbar Hidden. (Formerly Zen)
-  const [layoutMode, setLayoutMode] = useState<'STANDARD' | 'IMMERSIVE' | 'PURE'>('STANDARD');
-
-  // Persistence State
-  const [webdavConfig, setWebdavConfig] = useState<WebDAVConfig>(() => {
-    const saved = localStorage.getItem('webdav_config');
-    return saved ? JSON.parse(saved) : { enabled: false, url: '', username: '', password: '' };
-  });
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [aiConfig, setAiConfig] = useState<AIConfig>(() => {
-      const saved = localStorage.getItem('ai_config');
-      return saved ? JSON.parse(saved) : { provider: 'gemini', apiKey: '', modelName: '' };
-  });
-  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>(() => {
-      const saved = localStorage.getItem('voice_config');
-      return saved ? JSON.parse(saved) : { enabled: true, language: 'zh-CN' };
-  });
-
   const [activeView, setActiveView] = useState<ViewMode>('EDITOR');
   const [aiLoading, setAiLoading] = useState(false);
+  const [lookbackCount, setLookbackCount] = useState(1);
+  const [layoutMode, setLayoutMode] = useState<'STANDARD' | 'IMMERSIVE' | 'PURE'>('STANDARD');
 
-  // Use Custom Hook for Novel Logic
+  // Editor Appearance State
+  const [fontFamily, setFontFamily] = useState<EditorFont>('serif');
+  const [fontSize, setFontSize] = useState<number>(18);
+
+  // Sidebar States
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+
+  // Sync Layout Mode with Sidebars
+  useEffect(() => {
+      if (layoutMode === 'STANDARD') {
+          setIsLeftSidebarOpen(true);
+          setIsRightSidebarOpen(true);
+      } else if (layoutMode === 'IMMERSIVE') {
+          setIsLeftSidebarOpen(false);
+          setIsRightSidebarOpen(false);
+      } else if (layoutMode === 'PURE') {
+          setIsLeftSidebarOpen(false);
+          setIsRightSidebarOpen(false);
+      }
+  }, [layoutMode]);
+
   const novelManager = useNovelManager(language);
 
   useEffect(() => {
@@ -64,261 +53,209 @@ const App: React.FC = () => {
     }
   }, [theme]);
 
-  useEffect(() => localStorage.setItem('webdav_config', JSON.stringify(webdavConfig)), [webdavConfig]);
-  useEffect(() => localStorage.setItem('ai_config', JSON.stringify(aiConfig)), [aiConfig]);
-  useEffect(() => localStorage.setItem('voice_config', JSON.stringify(voiceConfig)), [voiceConfig]);
-
-  const openSettings = (tab: typeof settingsInitialTab = 'general') => {
-      setSettingsInitialTab(tab);
+  const openSettings = () => {
       setIsSettingsOpen(true);
-  };
-
-  const handleSync = async () => { 
-      if (!webdavConfig.url) {
-          toast.error(t[language].webdavNotConfigured);
-          openSettings('webdav');
-          return;
-      }
-
-      setIsSyncing(true); 
-      try {
-          // Simulate Sync Delay
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          logger.info('Sync completed'); 
-          toast.success(t[language].syncSuccess);
-      } catch (e) {
-          logger.error('Sync failed', e);
-          toast.error(t[language].syncFail);
-      } finally {
-          setIsSyncing(false);
-      }
   };
 
   const handleUpdateNovel = (id: string, updates: Partial<any>) => {
       novelManager.setNovels(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
   };
 
+  // Prep context data
+  const activeChapterIndex = novelManager.flatChapters.findIndex(c => c.id === novelManager.activeChapter?.id);
+  const maxLookback = Math.min(5, Math.max(0, activeChapterIndex));
+  const startIndex = Math.max(0, activeChapterIndex - lookbackCount);
+  const precedingChapters = lookbackCount > 0 ? novelManager.flatChapters.slice(startIndex, activeChapterIndex) : [];
+  const previousContent = precedingChapters.map(c => c.sections.map(s => s.content).join('\n')).join('\n\n');
+
+  const handleScrollToSection = (sectionId: string) => {
+      const element = document.getElementById(`section-${sectionId}`);
+      if (element) {
+          // Attempt to find the scrollable container (Editor Content)
+          const container = element.closest('.custom-scrollbar');
+          
+          if (container) {
+              const containerRect = container.getBoundingClientRect();
+              const elementRect = element.getBoundingClientRect();
+              
+              const currentScroll = container.scrollTop;
+              const relativeTop = elementRect.top - containerRect.top;
+              
+              // Target: ~30% down from the top (Visual Sweet Spot), instead of exactly center (50%)
+              const targetOffset = containerRect.height * 0.3; 
+              
+              const scrollTo = currentScroll + relativeTop - targetOffset;
+
+              container.scrollTo({
+                  top: scrollTo,
+                  behavior: 'smooth'
+              });
+          } else {
+              // Fallback: Use built-in logic if container isn't found
+              // block: 'center' puts it in middle, we want it slightly higher, 
+              // but without container ref, 'start' or 'center' are the main options.
+              // 'center' is the closest standard backup.
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+      }
+  };
+
   const renderContent = () => {
+    // 1. Bookshelf View
     if (!novelManager.activeNovelId || !novelManager.activeNovel || !novelManager.activeChapter) {
         return (
             <Bookshelf 
                novels={novelManager.novels}
-               deletedNovels={novelManager.deletedNovels}
+               deletedNovels={[]} 
                onCreateNovel={novelManager.createNovel}
                onImportNovel={novelManager.importNovel}
                onExportNovel={() => {}} 
                onSelectNovel={novelManager.setActiveNovelId}
                onDeleteNovel={novelManager.deleteNovel}
-               onRestoreNovel={(id) => {
-                   const n = novelManager.deletedNovels.find(n => n.id === id);
-                   if(n) {
-                       novelManager.setNovels(prev => [n, ...prev]);
-                       novelManager.setDeletedNovels(prev => prev.filter(x => x.id !== id));
-                   }
-               }}
-               onPermanentDeleteNovel={(id) => novelManager.setDeletedNovels(prev => prev.filter(n => n.id !== id))}
+               onRestoreNovel={() => {}}
+               onPermanentDeleteNovel={() => {}}
                onUpdateNovel={handleUpdateNovel}
                language={language}
                onToggleLanguage={() => setLanguage(l => l === 'zh' ? 'en' : 'zh')}
                theme={theme}
                onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
-               onOpenSettings={() => openSettings('general')}
-               onOpenData={() => openSettings('data')}
-               onSync={handleSync}
-               isSyncing={isSyncing}
+               onOpenSettings={openSettings}
             />
         );
     }
 
+    // 2. Workspace View (Bento Box Layout)
+    const isPure = layoutMode === 'PURE';
+
     return (
-        <div className="flex w-full h-screen bg-[#f8fafc] dark:bg-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-900/50 dark:selection:text-indigo-200 overflow-hidden transition-colors relative">
+        <div className={`h-screen w-full flex flex-col font-sans overflow-hidden transition-colors relative selection:bg-primary-100 selection:text-primary-900 dark:selection:bg-primary-900/50 dark:selection:text-primary-200 ${isPure ? 'bg-white dark:bg-black p-0' : 'bg-[#f2f4f7] dark:bg-black p-3 sm:p-4 gap-3 sm:gap-4'}`}>
           
-          {/* 1. Sidebar Navigation (Leftmost) - Show ONLY in STANDARD mode */}
-          <div className={`shrink-0 h-full z-40 bg-white dark:bg-[#09090b] border-r border-slate-200/50 dark:border-white/5 transition-all duration-500 ease-in-out ${layoutMode === 'STANDARD' ? 'ml-0 opacity-100' : '-ml-20 opacity-0 pointer-events-none'}`}>
+          {/* Row 1: Top Navigation Card */}
+          <div className={`shrink-0 bg-white dark:bg-[#161b22] rounded-[20px] shadow-sm border border-slate-200/60 dark:border-white/5 overflow-hidden z-50 transition-all duration-500 ease-in-out ${isPure ? 'max-h-0 opacity-0 mb-0 border-0' : 'max-h-20 opacity-100'}`}>
               <SidebarNav 
                 activeView={activeView}
                 onSelectView={setActiveView}
                 onBackToBookshelf={() => novelManager.setActiveNovelId(null)}
-                onOpenSettings={() => openSettings('general')}
+                onOpenSettings={openSettings}
                 theme={theme}
                 onToggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
                 language={language}
                 onToggleLanguage={() => setLanguage(l => l === 'zh' ? 'en' : 'zh')}
+                layoutMode={layoutMode}
+                onChangeLayoutMode={setLayoutMode}
               />
           </div>
 
-          {/* 2. Chapter Directory (Middle-Left) - Show ONLY in STANDARD mode */}
-          <div className={`shrink-0 h-full z-30 transition-all duration-500 ease-in-out overflow-hidden ${layoutMode === 'STANDARD' ? 'w-80 opacity-100' : 'w-0 opacity-0'}`}>
-              <Sidebar 
-                novel={novelManager.activeNovel}
-                activeView={activeView}
-                onSelectChapter={(id) => novelManager.updateActiveNovel({ activeChapterId: id })}
-                onMoveItem={novelManager.moveItem}
-                onRenameItem={(id, title) => {
-                    novelManager.updateChapter(id, { title }); 
-                }}
-                onUpdateChapterStatus={(id, status) => novelManager.updateChapter(id, { status })}
-                onCreateChapter={novelManager.createChapter}
-                onCreateVolume={novelManager.createVolume}
-                onDeleteItem={novelManager.deleteItem}
-                onToggleVolume={(id) => {
-                    const items = novelManager.activeNovel!.items.map(item => item.id === id && item.type === 'VOLUME' ? { ...item, collapsed: !item.collapsed } : item);
-                    novelManager.updateActiveNovel({ items });
-                }}
-                onBackToBookshelf={() => novelManager.setActiveNovelId(null)}
-                language={language}
-                onRestoreItem={novelManager.restoreTrashItem}
-                onPermanentDeleteItem={novelManager.permanentDeleteTrashItem}
-                onRestoreItemToLocation={novelManager.restoreItemToLocation}
-              />
-          </div>
+          {/* Row 2: Main Content Grid */}
+          <div className="flex-1 flex gap-3 sm:gap-4 min-h-0 overflow-hidden relative">
+              
+              {/* Card 1: Left Sidebar (Animated) */}
+              <div className={`
+                  shrink-0 bg-white dark:bg-[#161b22] rounded-[24px] shadow-sm border border-slate-200/60 dark:border-white/5 overflow-hidden flex flex-col 
+                  transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]
+                  ${isLeftSidebarOpen && !isPure ? 'w-80 opacity-100 translate-x-0' : 'w-0 opacity-0 -translate-x-10 border-0 pointer-events-none'}
+              `}>
+                  <div className="w-80 h-full flex flex-col"> {/* Fixed width container to prevent squash */}
+                      <Sidebar 
+                        novel={novelManager.activeNovel}
+                        activeView={activeView}
+                        onSelectChapter={(id) => novelManager.updateActiveNovel({ activeChapterId: id })}
+                        onMoveItem={novelManager.moveItem}
+                        onRenameItem={(id, title) => novelManager.updateChapter(id, { title })}
+                        onCreateChapter={novelManager.createChapter}
+                        onDeleteItem={novelManager.deleteItem}
+                        language={language}
+                        isOpen={true} 
+                        onClose={() => setIsLeftSidebarOpen(false)}
+                        onScrollToSection={handleScrollToSection}
+                      />
+                  </div>
+              </div>
 
-          {/* 3. Main Workspace (Right, Elastic) */}
-          <Layout>
-            {renderWorkspaceView()}
-          </Layout>
+              {/* Card 2: Center Workspace (Main) */}
+              <div className={`flex-1 bg-white dark:bg-[#161b22] shadow-sm border border-slate-200/60 dark:border-white/5 overflow-hidden flex flex-col relative transition-all duration-500 ${isPure ? 'rounded-none border-none' : 'rounded-[24px]'}`}>
+                  <Layout>
+                    <Workspace 
+                        activeView={activeView}
+                        novel={novelManager.activeNovel}
+                        chapter={novelManager.activeChapter}
+                        novelManager={novelManager}
+                        language={language}
+                        voiceConfig={{ enabled: false, language: 'zh-CN' }} 
+                        aiLoading={aiLoading}
+                        fontFamily={fontFamily} 
+                        setFontFamily={setFontFamily}
+                        fontSize={fontSize} 
+                        setFontSize={setFontSize}
+                        layoutMode={layoutMode}
+                        setLayoutMode={setLayoutMode}
+                        onSync={() => {}}
+                        isSyncing={false}
+                        isContextVisible={isRightSidebarOpen} 
+                        onToggleContext={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+                        lookbackCount={lookbackCount}
+                    />
+                  </Layout>
+
+                  {/* Pure Mode Restoration Button */}
+                  <div className={`fixed bottom-8 right-8 z-50 transition-all duration-500 ${isPure ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+                      <button 
+                        onClick={() => setLayoutMode('STANDARD')}
+                        className="p-4 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white/50 hover:text-white transition-all shadow-2xl group"
+                        title="退出纯净模式"
+                      >
+                          <PanelLeftOpenIcon className="w-6 h-6" />
+                          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 text-xs font-bold bg-black/80 text-white px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                              恢复界面
+                          </span>
+                      </button>
+                  </div>
+              </div>
+
+              {/* Card 3: Right Sidebar (Animated) */}
+              <div className={`
+                  shrink-0 bg-white dark:bg-[#161b22] rounded-[24px] shadow-sm border border-slate-200/60 dark:border-white/5 overflow-hidden flex flex-col 
+                  transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)]
+                  ${isRightSidebarOpen && !isPure ? 'w-80 opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-10 border-0 pointer-events-none'}
+              `}>
+                  <div className="w-80 h-full flex flex-col"> {/* Fixed width container */}
+                      <ContextSidebar 
+                          isOpen={true}
+                          onClose={() => setIsRightSidebarOpen(false)}
+                          worldEntities={novelManager.activeNovel.worldEntities}
+                          rules={novelManager.activeNovel.rules}
+                          events={novelManager.getAllEvents(novelManager.activeNovel)}
+                          maxLookback={maxLookback}
+                          lookbackCount={lookbackCount}
+                          onLookbackChange={setLookbackCount}
+                          language={language}
+                          globalOutline={novelManager.activeNovel.globalOutline}
+                          chapterOutline={novelManager.activeChapter.outline}
+                          localRules={novelManager.activeChapter.localRules || ""}
+                          previousContent={previousContent}
+                          chapterTitle={novelManager.activeChapter.title}
+                          lookbackChapters={precedingChapters}
+                          activeView={activeView}
+                      />
+                  </div>
+              </div>
+          </div>
         </div>
     );
   };
 
-  const renderWorkspaceView = () => {
-    const novel = novelManager.activeNovel!;
-    const chapter = novelManager.activeChapter;
-
-    switch (activeView) {
-        case 'EDITOR':
-            return (
-                <Editor 
-                    activeChapterId={chapter.id}
-                    chapters={novelManager.flatChapters}
-                    sections={chapter.sections}
-                    title={chapter.title}
-                    onUpdateSection={novelManager.updateSection}
-                    onAddSection={novelManager.addSection}
-                    onDeleteSection={novelManager.deleteSection}
-                    onTitleChange={(t) => novelManager.updateChapter(chapter.id, { title: t })}
-                    worldEntities={novel.worldEntities}
-                    rules={novel.rules}
-                    onAICommand={() => {}} 
-                    isAILoading={aiLoading}
-                    onUpdateWorld={(newEntities) => novelManager.updateActiveNovel({ worldEntities: [...novel.worldEntities, ...newEntities] })}
-                    language={language}
-                    voiceConfig={voiceConfig}
-                    globalOutline={novel.globalOutline}
-                    fontFamily={fontFamily}
-                    setFontFamily={setFontFamily}
-                    fontSize={fontSize}
-                    setFontSize={setFontSize}
-                    localRules={chapter.localRules}
-                    trash={novel.trash}
-                    onRestoreSection={novelManager.restoreTrashItem}
-                    onPermanentDeleteSection={novelManager.permanentDeleteTrashItem}
-                    onMoveSection={novelManager.moveSection}
-                    layoutMode={layoutMode}
-                    onChangeLayoutMode={setLayoutMode}
-                />
-            );
-        case 'OUTLINE':
-            return (
-                <OutlineView 
-                    activeNovel={novel}
-                    activeChapter={chapter}
-                    chapters={novelManager.flatChapters}
-                    onUpdateChapterOutline={(id, text) => novelManager.updateChapter(id, { outline: text })}
-                    onUpdateChatHistory={(id, history) => novelManager.updateChapter(id, { chatHistory: history })}
-                    onUpdateGlobalOutline={(text) => novelManager.updateActiveNovel({ globalOutline: text })}
-                    onUpdateGlobalChatHistory={(history) => novelManager.updateActiveNovel({ globalChatHistory: history })}
-                    worldEntities={novel.worldEntities}
-                    rules={novel.rules}
-                    events={novelManager.getAllEvents(novel)}
-                    language={language}
-                    globalOutline={novel.globalOutline} 
-                    onSync={handleSync}
-                    isSyncing={isSyncing}
-                />
-            );
-        case 'WORLD':
-            return (
-                <WorldView 
-                    entities={novel.worldEntities}
-                    trash={novel.trash}
-                    onAddEntity={(e) => novelManager.updateActiveNovel({ worldEntities: [...novel.worldEntities, e] })}
-                    onDeleteEntity={novelManager.deleteWorldEntity}
-                    onUpdateEntity={(e) => novelManager.updateActiveNovel({ worldEntities: novel.worldEntities.map(ent => ent.id === e.id ? e : ent) })}
-                    onRestoreEntity={novelManager.restoreTrashItem}
-                    onPermanentDeleteEntity={novelManager.permanentDeleteTrashItem}
-                    language={language}
-                />
-            );
-        case 'RULES':
-            return (
-                <RulesView 
-                    rules={novel.rules}
-                    trash={novel.trash}
-                    onAddRule={(r) => novelManager.updateActiveNovel({ rules: [...novel.rules, r] })}
-                    onDeleteRule={novelManager.deleteRule}
-                    onUpdateRule={(r) => novelManager.updateActiveNovel({ rules: novel.rules.map(rule => rule.id === r.id ? r : rule) })}
-                    onRestoreRule={novelManager.restoreTrashItem}
-                    onPermanentDeleteRule={novelManager.permanentDeleteTrashItem}
-                    language={language}
-                    activeChapter={chapter}
-                    onUpdateChapterLocalRules={(rules) => novelManager.updateChapter(chapter.id, { localRules: rules })}
-                />
-            );
-        case 'EVENTS':
-            return (
-                <EventsView 
-                    chapters={novelManager.flatChapters}
-                    activeChapterId={novel.activeChapterId}
-                    language={language}
-                    worldEntities={novel.worldEntities} 
-                />
-            );
-        case 'TRASH':
-            return (
-                <ChapterTrashView 
-                    deletedItems={novel.trash} 
-                    onRestoreChapter={novelManager.restoreTrashItem}
-                    onPermanentDeleteChapter={novelManager.permanentDeleteTrashItem}
-                    language={language}
-                />
-            );
-        default:
-            return null;
-    }
-  };
-
   return (
     <>
-        <ToastContainer />
-        {renderContent()}
-        <LogConsole isOpen={isDebugMode} onClose={() => setIsDebugMode(false)} />
-        <SettingsModal 
-            isOpen={isSettingsOpen}
-            onClose={() => setIsSettingsOpen(false)}
-            language={language}
-            setLanguage={setLanguage}
-            theme={theme}
-            setTheme={setTheme}
-            fontFamily={fontFamily}
-            setFontFamily={setFontFamily}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            webdavConfig={webdavConfig}
-            setWebdavConfig={setWebdavConfig}
-            aiConfig={aiConfig}
-            setAiConfig={setAiConfig}
-            voiceConfig={voiceConfig}
-            setVoiceConfig={setVoiceConfig}
-            isDebugMode={isDebugMode}
-            setIsDebugMode={setIsDebugMode}
-            onSync={handleSync}
-            isSyncing={isSyncing}
-            novels={novelManager.novels}
-            activeNovel={novelManager.activeNovel}
-            onImportNovel={novelManager.importNovel}
-            initialTab={settingsInitialTab}
-        />
+      {renderContent()}
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)}
+        language={language}
+        setLanguage={setLanguage}
+        theme={theme}
+        setTheme={setTheme}
+      />
+      <ToastContainer />
     </>
   );
 };

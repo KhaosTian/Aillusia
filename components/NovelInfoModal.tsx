@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Novel, AIConfig } from '../types';
+import { Novel } from '../types';
 import { DownloadIcon, TrashIcon } from './Icons';
 import { CoverGenerator } from './novel/CoverGenerator';
 import { toast } from '../services/toast';
@@ -10,7 +10,6 @@ interface NovelInfoModalProps {
   onClose: () => void;
   novel: Novel | null;
   onSave: (id: string, updates: Partial<Novel>) => void;
-  aiConfig: AIConfig;
 }
 
 const COLORS = [
@@ -23,7 +22,7 @@ const COLORS = [
   'linear-gradient(135deg, #475569 0%, #94a3b8 100%)', // Gray
 ];
 
-export const NovelInfoModal: React.FC<NovelInfoModalProps> = ({ isOpen, onClose, novel, onSave, aiConfig }) => {
+export const NovelInfoModal: React.FC<NovelInfoModalProps> = ({ isOpen, onClose, novel, onSave }) => {
   const [activeTab, setActiveTab] = useState<'INFO' | 'COVER'>('INFO');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -143,7 +142,7 @@ export const NovelInfoModal: React.FC<NovelInfoModalProps> = ({ isOpen, onClose,
                             </div>
                         </div>
                     ) : (
-                        <CoverGenerator aiConfig={aiConfig} onCoverGenerated={setCoverImage} />
+                        <CoverGenerator onCoverGenerated={setCoverImage} />
                     )}
                 </div>
 
