@@ -111,7 +111,7 @@ export const OutlineView: React.FC<OutlineViewProps> = ({
         {/* Split Content */}
         <div className="flex-1 flex gap-6 min-h-0 p-6 bg-slate-50/50 dark:bg-[#0d1117]/30 custom-scrollbar overflow-hidden">
             {/* Left: Chat (Card) */}
-            <div className="flex-1 min-w-0 bg-white dark:bg-[#161b22] rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden flex flex-col">
+            <div className="flex-1 min-w-0 flex flex-col h-full">
                 <OutlineChat 
                     chatHistory={activeChatHistory}
                     isChatting={isChatting}
@@ -123,7 +123,7 @@ export const OutlineView: React.FC<OutlineViewProps> = ({
             </div>
 
             {/* Right: Editor (Card) */}
-            <div className="flex-1 min-w-0 bg-white dark:bg-[#161b22] rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden flex flex-col">
+            <div className="flex-1 min-w-0 flex flex-col h-full">
                 <OutlineEditor 
                     content={activeContent}
                     onChange={handleContentChange}

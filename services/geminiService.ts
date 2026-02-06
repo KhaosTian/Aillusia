@@ -57,12 +57,17 @@ export const analyzeChapterContent = async (text: string, existingEntities: Worl
     const entitiesContext = existingEntities.map(e => e.name).slice(0, 100).join(', ');
     
     const prompt = `
-    Analyze the following novel chapter content.
-    Identify NEW World Entities (Characters, Settings, Items, Lore) that appear for the first time or are significant.
-    Compare with existing entities: ${entitiesContext}.
-    Do NOT return existing entities unless they have major updates.
+    请深度阅读并分析以下小说章节内容。
+    识别其中【新出现】或【有重大更新】的世界观实体（包含：角色 Characters, 场景 Settings, 物品 Items, 设定 Lore）。
+    
+    对比现有实体库：${entitiesContext}。
+    
+    要求：
+    1. 除非实体有重大状态改变，否则不要返回已存在的实体。
+    2. name (名称) 和 description (描述) 必须使用中文。
+    3. description 应简洁概括该实体在本章的表现或特征。
 
-    Content:
+    小说正文：
     ${text.slice(0, 30000)}
     `;
 
@@ -102,11 +107,13 @@ export const analyzeChapterContent = async (text: string, existingEntities: Worl
 export const summarizeSectionForEvent = async (text: string): Promise<string[]> => {
     const ai = getClient();
     const prompt = `
-    Summarize the key plot events in this section of a novel.
-    Return a list of short, concise sentences (Chinese).
-    Max 3 events.
+    请总结这段小说正文的关键剧情事件。
+    要求：
+    1. 返回一个字符串数组。
+    2. 每个事件用一句简练的中文概括。
+    3. 最多提取 3 个关键事件。
     
-    Text:
+    正文：
     ${text.slice(0, 10000)}
     `;
 
@@ -163,9 +170,10 @@ export async function* streamOutlineChat(
     ${previousContent.slice(0, 1000)}...
     `;
 
-    const systemInstruction = `You are a professional novel writing assistant (Outline Consultant).
-    Help the user brainstorm and structure their outline.
-    If you suggest options, use the format :::choices ["Option 1", "Option 2"] ::: at the end.
+    const systemInstruction = `你是一位专业的小说创作顾问（大纲专家）。
+    请根据上下文帮助用户构思和梳理大纲。
+    始终使用中文回复。
+    如果需要提供选项建议，请在回复末尾使用格式 :::choices ["选项1", "选项2"] :::。
     
     CONTEXT:
     ${contextStr}
@@ -196,9 +204,10 @@ export const generateOutlineFromChat = async (history: ChatMessage[], title: str
     const ai = getClient();
     const chatText = history.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
     const prompt = `
-    Based on the following discussion about "${title}", generate a structured Markdown outline.
+    基于以下关于《${title}》的讨论内容，整理并生成一份结构清晰的 Markdown 格式大纲。
+    请使用中文。
     
-    Discussion:
+    讨论记录：
     ${chatText}
     `;
 
@@ -245,13 +254,13 @@ export const generateCoverImage = async (prompt: string, style: string): Promise
 export const proofreadText = async (text: string): Promise<string> => {
     const ai = getClient();
     const prompt = `
-    You are a professional editor. Proofread the following novel text.
-    Focus ONLY on fixing objective errors: typos, punctuation mistakes, and clear grammatical errors.
-    Do NOT change the writing style, tone, or choice of words unless they are erroneous.
-    Do NOT add comments or explanations.
-    Return only the corrected text.
+    你是一名专业编辑。请校对以下小说正文。
+    重点：仅修正客观错误（错别字、标点符号错误、明显的语法语病）。
+    严禁：不要修改作者的文风、语气或用词习惯（除非是错误的）。
+    严禁：不要添加任何注释或解释。
+    仅返回修正后的纯文本。
 
-    Text:
+    正文：
     ${text}
     `;
 

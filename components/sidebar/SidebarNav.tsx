@@ -77,8 +77,8 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
             {/* Center: Main Navigation Tabs */}
             <div className="flex items-center justify-center gap-1 bg-white dark:bg-[#161b22]">
-                <NavItem view="EDITOR" activeView={activeView} onSelect={onSelectView} icon={PenIcon} label={currentT.editor} />
                 <NavItem view="OUTLINE" activeView={activeView} onSelect={onSelectView} icon={LayoutIcon} label={currentT.outline} />
+                <NavItem view="EDITOR" activeView={activeView} onSelect={onSelectView} icon={PenIcon} label={currentT.editor} />
                 <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-2"></div>
                 <NavItem view="WORLD" activeView={activeView} onSelect={onSelectView} icon={GlobeIcon} label={currentT.world} />
                 <NavItem view="RULES" activeView={activeView} onSelect={onSelectView} icon={ScaleIcon} label={currentT.rules} />

@@ -95,46 +95,51 @@ export const Editor: React.FC<EditorProps> = ({
       
       // 2. Record History (Debounced inside hook)
       // We assume the update will be applied, so we construct the new state for history
+      // Note: We use the *current* sections array which contains current events.
+      // Even if history records events, we will ignore them on Undo (see mergeHistoryState).
       const newSections = sections.map(s => s.id === id ? { ...s, content } : s);
       record(newSections, false); // false = debounce
   }, [sections, onUpdateSection, record]);
 
-  const handleAddSectionWrapped = () => {
-      onAddSection();
-      // NOTE: We can't record immediately because we don't have the new ID yet.
-      // Ideally, onAddSection should return the new section or ID.
-      // For now, we rely on useEffect tracking 'sections' length change, 
-      // but simpler to just let the history hook sync on structure change if we passed 'sections' as dependency?
-      // Actually, useChapterHistory doesn't auto-record on prop change to avoid loops.
-      // We will record the *current* sections as a snapshot BEFORE the action in the reducer style, 
-      // but here we are in a parent component.
-      
-      // Workaround: We'll push the *current* state to history stack before mutation 
-      // so we can undo back to it? No, undo stack stores *past* states.
-      // If we add a section, the *new* state should be pushed.
-      // Since `sections` prop updates async, we can use a `useEffect` to track structure changes.
-  };
-
   // Track structural changes for history (Add/Delete/Move)
   useEffect(() => {
       // If the number of sections or their order changes, we record a snapshot immediately.
-      // This is a heuristic: if length changes or IDs order changes.
-      // We skip this check on mount.
       record(sections, true); 
   }, [sections.length, sections.map(s => s.id).join(',')]);
 
+  // --- History Merge Logic (Preserves Events) ---
+  const mergeHistoryState = useCallback((historySections: Section[], currentSections: Section[]): Section[] => {
+      // Map current events by ID for easy lookup
+      const currentEventsMap = new Map<string, string[]>();
+      currentSections.forEach(s => {
+          if (s.events && s.events.length > 0) currentEventsMap.set(s.id, s.events);
+      });
+
+      return historySections.map(hSection => {
+          const currentEvents = currentEventsMap.get(hSection.id);
+          // If current section has events, keep them to avoid undoing Story Flow.
+          // If current section is missing (e.g. undoing a delete), we fall back to history events.
+          if (currentEvents) {
+              return { ...hSection, events: currentEvents };
+          }
+          return hSection;
+      });
+  }, []);
 
   const handleGlobalUndo = () => {
       const prevSections = undo();
       if (prevSections) {
-          onSetSections(prevSections);
+          // Merge text from history with events from current state
+          const merged = mergeHistoryState(prevSections, sections);
+          onSetSections(merged);
       }
   };
 
   const handleGlobalRedo = () => {
       const nextSections = redo();
       if (nextSections) {
-          onSetSections(nextSections);
+          const merged = mergeHistoryState(nextSections, sections);
+          onSetSections(merged);
       }
   };
 

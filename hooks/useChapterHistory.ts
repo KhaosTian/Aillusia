@@ -5,6 +5,7 @@ import { Section } from '../types';
 export const useChapterHistory = (currentSections: Section[], activeChapterId: string) => {
     const [history, setHistory] = useState<Section[][]>([currentSections]);
     const [pointer, setPointer] = useState(0);
+    const pointerRef = useRef(0); // Sync ref to avoid stale closures
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
     const lastActiveChapterRef = useRef(activeChapterId);
 
@@ -13,6 +14,7 @@ export const useChapterHistory = (currentSections: Section[], activeChapterId: s
         if (lastActiveChapterRef.current !== activeChapterId) {
             setHistory([currentSections]);
             setPointer(0);
+            pointerRef.current = 0;
             lastActiveChapterRef.current = activeChapterId;
         }
     }, [activeChapterId, currentSections]);
@@ -22,22 +24,30 @@ export const useChapterHistory = (currentSections: Section[], activeChapterId: s
 
         const push = () => {
             setHistory(prev => {
-                // If we are not at the end, slice history
-                const currentHistory = prev.slice(0, pointer + 1);
+                const currentPtr = pointerRef.current;
+                const currentHistory = prev.slice(0, currentPtr + 1);
                 
-                // Avoid duplicates: check if newSections is identical to current top
                 const top = currentHistory[currentHistory.length - 1];
+                
+                // Deep compare (simplified) to avoid duplicate consecutive states
                 if (JSON.stringify(top) === JSON.stringify(newSections)) return prev;
 
                 const newHistory = [...currentHistory, newSections];
-                // Limit history size (e.g., 50 steps)
-                if (newHistory.length > 50) return newHistory.slice(newHistory.length - 50);
-                return newHistory;
+                
+                let newPtr = newHistory.length - 1;
+                let finalHistory = newHistory;
+
+                // Limit history size to 50
+                if (newHistory.length > 50) {
+                    finalHistory = newHistory.slice(newHistory.length - 50);
+                    newPtr = finalHistory.length - 1;
+                }
+                
+                pointerRef.current = newPtr;
+                setPointer(newPtr);
+                
+                return finalHistory;
             });
-            // Update pointer needs to happen after setHistory resolves, but in functional update we can't reliably sync perfectly unless separate.
-            // Actually, setPointer(h => h.length - 1) is better but we slice based on pointer.
-            // So we just increment pointer.
-            setPointer(p => Math.min(p + 1, 49)); // Cap pointer
         };
 
         if (immediate) {
@@ -45,25 +55,29 @@ export const useChapterHistory = (currentSections: Section[], activeChapterId: s
         } else {
             debounceRef.current = setTimeout(push, 1000);
         }
-    }, [pointer]);
+    }, []);
 
     const undo = useCallback(() => {
-        if (pointer > 0) {
-            const newPointer = pointer - 1;
-            setPointer(newPointer);
-            return history[newPointer];
+        const currentPtr = pointerRef.current;
+        if (currentPtr > 0) {
+            const newPtr = currentPtr - 1;
+            pointerRef.current = newPtr;
+            setPointer(newPtr);
+            return history[newPtr];
         }
         return null;
-    }, [history, pointer]);
+    }, [history]);
 
     const redo = useCallback(() => {
-        if (pointer < history.length - 1) {
-            const newPointer = pointer + 1;
-            setPointer(newPointer);
-            return history[newPointer];
+        const currentPtr = pointerRef.current;
+        if (currentPtr < history.length - 1) {
+            const newPtr = currentPtr + 1;
+            pointerRef.current = newPtr;
+            setPointer(newPtr);
+            return history[newPtr];
         }
         return null;
-    }, [history, pointer]);
+    }, [history]);
 
     return {
         record,
