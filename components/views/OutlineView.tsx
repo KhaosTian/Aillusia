@@ -21,8 +21,6 @@ interface OutlineViewProps {
   events: EventLog[];
   language: Language;
   globalOutline: string;
-  onSync: () => void;
-  isSyncing: boolean;
 }
 
 export const OutlineView: React.FC<OutlineViewProps> = ({ 
@@ -36,7 +34,8 @@ export const OutlineView: React.FC<OutlineViewProps> = ({
   worldEntities,
   rules,
   events,
-  language
+  language,
+  globalOutline
 }) => {
   const currentT = t[language];
   const chapterIndex = chapters.findIndex(c => c.id === activeChapter.id);

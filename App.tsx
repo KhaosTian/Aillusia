@@ -106,14 +106,9 @@ const App: React.FC = () => {
         return (
             <Bookshelf 
                novels={novelManager.novels}
-               deletedNovels={[]} 
                onCreateNovel={novelManager.createNovel}
-               onImportNovel={novelManager.importNovel}
-               onExportNovel={() => {}} 
                onSelectNovel={novelManager.setActiveNovelId}
                onDeleteNovel={novelManager.deleteNovel}
-               onRestoreNovel={() => {}}
-               onPermanentDeleteNovel={() => {}}
                onUpdateNovel={handleUpdateNovel}
                language={language}
                onToggleLanguage={() => setLanguage(l => l === 'zh' ? 'en' : 'zh')}
@@ -181,7 +176,6 @@ const App: React.FC = () => {
                         chapter={novelManager.activeChapter}
                         novelManager={novelManager}
                         language={language}
-                        voiceConfig={{ enabled: false, language: 'zh-CN' }} 
                         aiLoading={aiLoading}
                         fontFamily={fontFamily} 
                         setFontFamily={setFontFamily}
@@ -189,8 +183,6 @@ const App: React.FC = () => {
                         setFontSize={setFontSize}
                         layoutMode={layoutMode}
                         setLayoutMode={setLayoutMode}
-                        onSync={() => {}}
-                        isSyncing={false}
                         isContextVisible={isRightSidebarOpen} 
                         onToggleContext={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
                         lookbackCount={lookbackCount}

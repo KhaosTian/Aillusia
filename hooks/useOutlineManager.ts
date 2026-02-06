@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { ChatMessage, Novel, Chapter, WorldEntity, Rule, EventLog } from '../types';
-import { streamOutlineChat, generateOutlineFromChat } from '../services/geminiService';
+import { streamOutlineChat } from '../services/geminiService';
 
 interface UseOutlineManagerProps {
     activeNovel: Novel;
@@ -10,10 +10,6 @@ interface UseOutlineManagerProps {
     onUpdateGlobalChatHistory: (history: ChatMessage[]) => void;
     onUpdateChapterOutline: (id: string, outline: string) => void;
     onUpdateGlobalOutline: (outline: string) => void;
-    
-    // Idea updaters removed
-    onUpdateChapterIdeas?: any;
-    onUpdateGlobalIdeas?: any;
     
     worldEntities: WorldEntity[];
     rules: Rule[];
@@ -34,7 +30,6 @@ export const useOutlineManager = ({
     previousContent
 }: UseOutlineManagerProps) => {
     const [isChatting, setIsChatting] = useState(false);
-    const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
     const [scope, setScope] = useState<'CHAPTER' | 'GLOBAL'>('CHAPTER');
 
     const activeChatHistory = scope === 'CHAPTER' ? activeChapter.chatHistory : activeNovel.globalChatHistory;
@@ -86,27 +81,6 @@ export const useOutlineManager = ({
         }
     };
 
-    // Helper to auto-generate if user asks, though now we prefer manual application
-    const handleGenerateOutline = async () => {
-        if (activeChatHistory.length === 0 || isGeneratingOutline) return;
-        setIsGeneratingOutline(true);
-        try {
-            const outline = await generateOutlineFromChat(
-                activeChatHistory, 
-                scope === 'CHAPTER' ? activeChapter.title : activeNovel.title
-            );
-            if (scope === 'CHAPTER') {
-                onUpdateChapterOutline(activeChapter.id, outline);
-            } else {
-                onUpdateGlobalOutline(outline);
-            }
-        } catch (error) {
-            console.error("Generate outline error", error);
-        } finally {
-            setIsGeneratingOutline(false);
-        }
-    };
-
     const handleContentChange = (val: string) => {
         if (scope === 'CHAPTER') onUpdateChapterOutline(activeChapter.id, val);
         else onUpdateGlobalOutline(val);
@@ -116,11 +90,9 @@ export const useOutlineManager = ({
         scope,
         setScope,
         isChatting,
-        isGeneratingOutline,
         activeChatHistory,
         activeContent,
         handleSendMessage,
-        handleGenerateOutline,
         handleContentChange
     };
 };

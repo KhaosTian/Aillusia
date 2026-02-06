@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ViewMode, Novel, Chapter, Language, VoiceConfig, EditorFont } from '../types';
+import { ViewMode, Novel, Chapter, Language, EditorFont } from '../types';
 import { Editor } from './Editor';
 import { OutlineView } from './views/OutlineView';
 import { WorldView } from './views/WorldView';
@@ -14,7 +14,6 @@ interface WorkspaceProps {
     chapter: Chapter;
     novelManager: any; 
     language: Language;
-    voiceConfig: VoiceConfig;
     aiLoading: boolean;
     fontFamily: EditorFont;
     setFontFamily: (font: EditorFont) => void;
@@ -22,8 +21,6 @@ interface WorkspaceProps {
     setFontSize: (size: number) => void;
     layoutMode: 'STANDARD' | 'IMMERSIVE' | 'PURE';
     setLayoutMode: (mode: 'STANDARD' | 'IMMERSIVE' | 'PURE') => void;
-    onSync: () => void;
-    isSyncing: boolean;
     isContextVisible: boolean;
     onToggleContext: () => void;
     lookbackCount: number;
@@ -99,8 +96,6 @@ export const Workspace: React.FC<WorkspaceProps> = ({
                         events={novelManager.getAllEvents(novel)}
                         language={language}
                         globalOutline={novel.globalOutline} 
-                        onSync={() => {}}
-                        isSyncing={false}
                     />
                 );
             case 'WORLD':

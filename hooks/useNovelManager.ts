@@ -15,7 +15,6 @@ export const useNovelManager = (language: string) => {
       setActiveNovelId,
       activeNovel,
       createNovel,
-      importNovel,
       deleteNovel,
       updateActiveNovel
   } = useNovelStorage(language);
@@ -77,7 +76,6 @@ export const useNovelManager = (language: string) => {
       setActiveNovelId,
       activeNovel,
       createNovel,
-      importNovel,
       deleteNovel,
       updateActiveNovel,
       

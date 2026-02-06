@@ -47,13 +47,6 @@ export interface Section {
   snapshots?: SectionSnapshot[]; 
 }
 
-export interface SectionHandle {
-    undo: () => void;
-    redo: () => void;
-    canUndo: boolean;
-    canRedo: boolean;
-}
-
 export interface Chapter {
   id: string;
   type: 'CHAPTER'; 
@@ -116,12 +109,6 @@ export interface Novel {
   importedAt?: number;
 }
 
-export interface AIState {
-  isLoading: boolean;
-  error: string | null;
-  lastResponse: string | null;
-}
-
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'ACTION';
 
 export interface LogEntry {
@@ -130,25 +117,6 @@ export interface LogEntry {
     level: LogLevel;
     message: string;
     details?: any;
-}
-
-export interface WebDAVConfig {
-    enabled: boolean;
-    url: string;
-    username?: string;
-    password?: string;
-}
-
-export interface AIConfig {
-    provider: string;
-    apiKey: string;
-    modelName?: string;
-    baseUrl?: string;
-}
-
-export interface VoiceConfig {
-    enabled: boolean;
-    language: string;
 }
 
 export type EditorFont = 'sans' | 'serif' | 'mono';

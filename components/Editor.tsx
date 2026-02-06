@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlusIcon } from './Icons';
-import { WorldEntity, Rule, Section, Language, Chapter, EditorFont, SectionHandle } from '../types';
+import { WorldEntity, Rule, Section, Language, Chapter, EditorFont } from '../types';
 import { AICommandBar } from './AICommandBar';
 import { ChapterAnalysisModal } from './ChapterAnalysisModal';
 import { analyzeChapterContent, summarizeSectionForEvent } from '../services/geminiService';
@@ -174,7 +174,6 @@ export const Editor: React.FC<EditorProps> = ({
       handleSectionDragStart,
       handleSectionDragOver,
       handleSectionDrop,
-      handleSectionUpdate, // This one was for generic updates, we use handleSectionContentUpdate for content
       handleSnapshotUpdate,
       handleSectionDelete
   } = useEditorDrag(onMoveSection, onUpdateSection, onDeleteSection);

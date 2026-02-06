@@ -5,7 +5,6 @@ import { DEFAULT_NOVEL } from '../defaultData';
 import { logger } from '../services/logger';
 import { t } from '../locales';
 import { toast } from '../services/toast';
-import { parseImportedNovel } from '../services/ioService';
 
 export const useNovelStorage = (language: string) => {
     const [novels, setNovels] = useState<Novel[]>([DEFAULT_NOVEL]);
@@ -45,18 +44,6 @@ export const useNovelStorage = (language: string) => {
         toast.success("新书已创建，开始创作吧！");
     };
 
-    const importNovel = async (file: File) => {
-        try {
-            const novel = await parseImportedNovel(file);
-            setNovels(prev => [novel, ...prev]);
-            logger.action('Imported novel', { title: novel.title });
-            toast.success("导入成功");
-        } catch (e) {
-            console.error(e);
-            toast.error("导入失败：格式错误");
-        }
-    };
-
     const deleteNovel = (id: string) => {
         if (confirm("确定要永久删除这本小说吗？此操作无法撤销。")) {
             setNovels(prev => prev.filter(n => n.id !== id));
@@ -80,7 +67,6 @@ export const useNovelStorage = (language: string) => {
         setActiveNovelId,
         activeNovel,
         createNovel,
-        importNovel,
         deleteNovel,
         updateActiveNovel
     };

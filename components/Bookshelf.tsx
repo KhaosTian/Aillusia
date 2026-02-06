@@ -9,14 +9,9 @@ import { CreateNovelCard } from './bookshelf/CreateNovelCard';
 
 interface BookshelfProps {
   novels: Novel[];
-  deletedNovels: Novel[]; 
   onCreateNovel: () => void;
-  onImportNovel: (file: File) => void;
   onSelectNovel: (id: string) => void;
   onDeleteNovel: (id: string) => void; 
-  onRestoreNovel: (id: string) => void;
-  onPermanentDeleteNovel: (id: string) => void;
-  onExportNovel: (novel: Novel) => void; 
   onUpdateNovel: (id: string, updates: Partial<Novel>) => void; 
   language: Language;
   onToggleLanguage: () => void;

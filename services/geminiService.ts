@@ -8,22 +8,6 @@ const getClient = () => {
     if (!key) throw new Error("API Key not found in environment variables.");
     return new GoogleGenAI({ apiKey: key });
 };
-
-export const testAIConnection = async (config: { apiKey: string }) => {
-    if (!config.apiKey) throw new Error("API Key is missing");
-    const ai = new GoogleGenAI({ apiKey: config.apiKey });
-    try {
-        await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: 'Test connection',
-        });
-        return true;
-    } catch (e) {
-        console.error("AI Connection Test Failed", e);
-        throw e;
-    }
-};
-
 // Retry wrapper with exponential backoff
 const retryWithBackoff = async <T>(
   fn: () => Promise<T>,
@@ -249,34 +233,6 @@ export const generateCoverImage = async (prompt: string, style: string): Promise
         throw e;
     }
 };
-
-// --- Proofreading ---
-export const proofreadText = async (text: string): Promise<string> => {
-    const ai = getClient();
-    const prompt = `
-    你是一名专业编辑。请校对以下小说正文。
-    重点：仅修正客观错误（错别字、标点符号错误、明显的语法语病）。
-    严禁：不要修改作者的文风、语气或用词习惯（除非是错误的）。
-    严禁：不要添加任何注释或解释。
-    仅返回修正后的纯文本。
-
-    正文：
-    ${text}
-    `;
-
-    try {
-        const response = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt
-        })) as GenerateContentResponse;
-        
-        return response.text?.trim() || text;
-    } catch (e) {
-        console.error("Proofread failed", e);
-        throw e;
-    }
-};
-
 // --- Context Preview Helper (Synchronous) ---
 export const getContextPreview = (
     worldEntities: WorldEntity[],
